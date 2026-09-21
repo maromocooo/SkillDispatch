@@ -8,7 +8,7 @@ catalog, pure selection policy, a TypeSafe Jev provider and an offline mock prov
 
 **Status:** PR5 development preview: discovery, routing, evaluation, and silent
 shadow hooks with private local JSONL traces and local trace inspection. Real Jev routing quality has not been
-established. Advisory injection, `doctor`, and Agent Skill Studio are not implemented.
+established. Advisory injection and Agent Skill Studio are not implemented.
 
 ## Install from source
 
@@ -59,6 +59,8 @@ skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
 skilldispatch hook codex
 skilldispatch hook claude
 
+skilldispatch doctor
+skilldispatch doctor --json
 skilldispatch traces summary --agent codex --since 7d
 skilldispatch traces list --limit 20 --outcome partial
 skilldispatch traces show <trace-id> --json
@@ -597,3 +599,23 @@ List keeps the newest 20 records by timestamp (UUID tie-break), with `--limit`
 `24h`, `7d`, etc. Time windows include both endpoints and exclude future timestamps;
 without `--since`, future records are included. Show requires a full UUID and exits
 1 for missing or duplicate IDs. Corrupt lines are counted and skipped.
+
+## Offline installation health
+
+After adding the shadow hook commands from the setup examples above, run
+`skilldispatch doctor`. It checks Node 20+, trusted config and user config location,
+hook project trust, both skill catalogs, provider and credential presence, private
+data/key/trace storage, the shipped schema and valid/invalid trace counts.
+It confirms hook **commands are available**, not that hosts have registered them.
+
+`doctor --json` returns `{version, usable, checks}` with PASS/WARN/FAIL checks.
+Exit 0 means no FAIL; exit 1 means a configuration or installation problem. Missing
+Jev credentials, a first-run missing key/trace and corrupt JSONL lines are WARN.
+Malformed settings, invalid credentials, unsafe storage or unwritable trace
+destinations are FAIL. Missing credentials still prevent useful Jev routing even
+though offline installation checks can complete successfully.
+
+Doctor makes no API calls, creates no key/directories/files, changes no host
+settings and appends no traces. Writability is a permission probe, not a disk-space
+or durability guarantee. It never prints credential values, skill paths or
+diagnostic messages. Configuration/data/trace locations are shown intentionally.

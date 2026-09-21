@@ -2,6 +2,7 @@ import type { Readable } from "node:stream";
 import { Command, Option } from "commander";
 import { VERSION } from "../version.js";
 import { discoverCommand } from "./commands/discover.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { evalCommand } from "./commands/eval.js";
 import { hookCommand } from "./commands/hook.js";
 import { routeCommand } from "./commands/route.js";
@@ -85,6 +86,13 @@ export function createProgram(
         `Shadow route ${host} skills and append a private local trace`,
       )
       .action(() => hookCommand(host, environment, stdin));
+  program
+    .command("doctor")
+    .description(
+      "Check local shadow routing readiness offline; no files changed",
+    )
+    .option("--json", "write privacy-safe JSON")
+    .action((options) => doctorCommand(options, environment, io));
   const traces = program
     .command("traces")
     .description(
