@@ -34,3 +34,13 @@ symlinks safely, retains distinct paths with duplicate names, and reads
 `agents/openai.yaml` can also exclude explicit-only skills from routing.
 Bundled system roots may be supplied through the adapter's `systemRoots` option;
 PR1 does not guess paths inside a Codex installation or plugin cache.
+
+Claude Code discovery reads `.claude/skills` from CWD to the repository root and
+`$CLAUDE_CONFIG_DIR/skills` (default `~/.claude/skills`). Missing names use the
+directory name; missing descriptions use the first non-empty body line, following
+the current native format. Invalid metadata still yields diagnostics.
+`disable-model-invocation` excludes a skill from automatic routing;
+`user-invocable: false` does not. PR1 retains same-name paths even when a native
+slash command would prefer the personal scope. Session visibility, managed
+settings, `skillOverrides`, plugins, synced skills and legacy commands are not
+modeled. This is a local catalog, not an assertion of host invocation behavior.
