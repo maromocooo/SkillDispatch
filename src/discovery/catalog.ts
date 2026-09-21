@@ -1,5 +1,5 @@
 import { compareText } from "../core/order.js";
-import type { Diagnostic, SkillDescriptor } from "../core/types.js";
+import type { AgentKind, Diagnostic, SkillDescriptor } from "../core/types.js";
 import type { DiscoveryResult } from "./types.js";
 
 export function finalizeCatalog(
@@ -17,15 +17,23 @@ export function finalizeCatalog(
   const skills = [...byId.values()].sort(
     (a, b) => compareText(a.agent, b.agent) || compareText(a.path, b.path),
   );
-  const names = new Map<string, string[]>();
-  for (const skill of skills)
-    names.set(skill.name, [...(names.get(skill.name) ?? []), skill.id]);
-  for (const [name, skillIds] of names) {
+  const names = new Map<
+    string,
+    { agent: AgentKind; name: string; skillIds: string[] }
+  >();
+  for (const skill of skills) {
+    const name = skill.name.replace(/\s+/gu, " ").trim();
+    const key = JSON.stringify([skill.agent, name]);
+    const group = names.get(key) ?? { agent: skill.agent, name, skillIds: [] };
+    group.skillIds.push(skill.id);
+    names.set(key, group);
+  }
+  for (const { agent, name, skillIds } of names.values()) {
     if (skillIds.length > 1)
       diagnostics.push({
         code: "duplicate_name",
         level: "warning",
-        message: `Multiple skills share the name ${JSON.stringify(name)}; all paths are retained.`,
+        message: `Multiple ${agent} skills share the name ${JSON.stringify(name)}; all paths are retained.`,
         skillIds,
       });
   }

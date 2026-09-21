@@ -55,6 +55,9 @@ From a source checkout, replace `skilldispatch` with `pnpm skilldispatch` or
 `discover --json` returns `{ skills, diagnostics }`, including disabled skills.
 Text mode prints name, agent, scope, enabled state, and canonical path, with
 diagnostics on stderr. Distinct paths with the same name remain separate skills.
+Routing supports skills from multiple host agents. Same-name skills from different
+agents are distinct and are not duplicate-name conflicts. `duplicate_name` groups
+only the same agent and whitespace-normalized name (case-sensitive).
 
 `route --json` returns `selected`, `allDecisions`, `router`, `policy`, and
 `diagnostics`. Decisions include IDs, names, paths, probabilities and selection

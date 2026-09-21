@@ -167,5 +167,14 @@ describe("Claude Code discovery", () => {
     const shared = result.skills.filter((s) => s.name === "cross-agent");
     expect(shared).toHaveLength(2);
     expect(new Set(shared.map((s) => s.id)).size).toBe(2);
+    expect(
+      result.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "duplicate_name" &&
+          diagnostic.skillIds?.some((id) =>
+            shared.some((skill) => skill.id === id),
+          ),
+      ),
+    ).toBe(false);
   });
 });
