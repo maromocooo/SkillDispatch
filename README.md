@@ -6,8 +6,9 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR2 development preview. Routing quality has not been evaluated yet.
-Hooks, telemetry, `doctor`, eval execution, and Agent Skill Studio are not implemented. The handoff and trace
+**Status:** PR3 development preview, including routing evaluation. Real Jev routing
+quality has not been established. Hooks, telemetry, `doctor`, and Agent Skill Studio
+are not implemented. The handoff and trace
 schema describe the future runtime, not the current CLI surface.
 
 ## Install from source
@@ -50,6 +51,10 @@ skilldispatch route "Review this authentication implementation"
 skilldispatch route "Build a React form and write tests" --json
 skilldispatch route "Review keyboard accessibility" --threshold 0.8 --max-skills 2
 skilldispatch discover --cwd ./packages/web --json
+
+skilldispatch eval evals/example.yaml
+skilldispatch eval evals/example.yaml --json
+skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
 ```
 
 From a source checkout, replace `skilldispatch` with `pnpm skilldispatch` or
@@ -74,6 +79,9 @@ Exit status is 0 for successful commands, empty selections, partial discovery,
 and fail-open provider failures (inspect diagnostics). Invalid CLI options,
 invalid configuration/credentials, or an inaccessible CWD return a nonzero status. `--json`
 applies to successful command results; usage/config errors are reported on stderr.
+Evaluation emits its result even when a quality gate fails (exit 2). Eval input,
+config and provider setup errors exit 1. Without gates, a completed evaluation
+exits 0; inspect reliability counts as well as quality metrics.
 
 ## Configuration
 

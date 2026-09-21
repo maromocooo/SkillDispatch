@@ -1,10 +1,8 @@
 import { route } from "../../core/route.js";
-import { JevRouterProvider } from "../../providers/jev.js";
-import { MockRouterProvider } from "../../providers/mock.js";
 import {
   type CliEnvironment,
   type CliOptions,
-  discoverForCommand,
+  routingForCommand,
 } from "../context.js";
 import { type CliIO, printDiagnostics, terminalText } from "../output.js";
 
@@ -15,23 +13,15 @@ export async function routeCommand(
   io: CliIO,
 ): Promise<void> {
   if (!prompt.trim()) throw new Error("Prompt must not be empty.");
-  const { cwd, config, agents, catalog } = await discoverForCommand(
+  const { cwd, config, agent, catalog, provider } = await routingForCommand(
     options,
     environment,
   );
-  const apiKey = environment.env.TYPESAFE_API_KEY;
-  const provider =
-    config.router.provider === "mock"
-      ? new MockRouterProvider(config.router.mock)
-      : new JevRouterProvider({
-          ...config.router.jev,
-          ...(apiKey === undefined ? {} : { apiKey }),
-        });
   const result = await route(
     {
       prompt,
       cwd,
-      agent: agents.length === 1 ? (agents[0] ?? "generic") : "generic",
+      agent,
       skills: catalog.skills,
     },
     provider,

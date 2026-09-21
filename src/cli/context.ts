@@ -10,6 +10,8 @@ import { finalizeCatalog } from "../discovery/catalog.js";
 import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
 import { CodexDiscoveryAdapter } from "../discovery/codex.js";
 import type { DiscoveryAdapter } from "../discovery/types.js";
+import { JevRouterProvider } from "../providers/jev.js";
+import { MockRouterProvider } from "../providers/mock.js";
 
 export interface CliOptions {
   agent?: DiscoveryAgent;
@@ -70,5 +72,29 @@ export async function discoverForCommand(
     config,
     agents,
     catalog: finalizeCatalog([{ skills: [], diagnostics }, ...results]),
+  };
+}
+
+/** Shared route/eval composition: config, catalog, provider and requesting agent. */
+export async function routingForCommand(
+  options: CliOptions,
+  environment: CliEnvironment,
+) {
+  const context = await discoverForCommand(options, environment);
+  const apiKey = environment.env.TYPESAFE_API_KEY;
+  const provider =
+    context.config.router.provider === "mock"
+      ? new MockRouterProvider(context.config.router.mock)
+      : new JevRouterProvider({
+          ...context.config.router.jev,
+          ...(apiKey === undefined ? {} : { apiKey }),
+        });
+  return {
+    ...context,
+    provider,
+    agent:
+      context.agents.length === 1
+        ? (context.agents[0] ?? "generic")
+        : ("generic" as const),
   };
 }

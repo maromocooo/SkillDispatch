@@ -1,29 +1,70 @@
+# Replace selectors with skills in your discovered catalog. Names are illustrative;
+# this file does not install skills or assert measured Jev accuracy.
 version: 1
 
-skills:
-  # Optional. If omitted, use currently discovered skills.
-  use_discovered: true
-
 cases:
+  - id: explicit-react
+    prompt: "Use the React patterns workflow to implement a login form."
+    should:
+      - {name: react-patterns, agent: codex, scope: repo}
+    should_not:
+      - {name: deployment, agent: codex, scope: repo}
+
+  - id: implicit-accessibility
+    prompt: "Make sure I can submit this form without touching a mouse."
+    should:
+      - {name: accessibility-review, agent: codex, scope: repo}
+
   - id: react-login
     prompt: "Implement the React login form and add tests."
     should:
-      - react-patterns
-      - frontend-testing
+      - {name: react-patterns, agent: codex, scope: repo}
+      - {name: frontend-testing, agent: codex, scope: repo}
     should_not:
-      - deployment
+      - {name: deployment, agent: codex, scope: repo}
+    fully_labeled: false
 
-  - id: keyboard-accessibility
-    prompt: "Check whether this form works using only the keyboard and fix the issues."
+  - id: unrelated-no-skill
+    prompt: "What is two plus two?"
+    should: []
+    fully_labeled: true
+
+  - id: overlapping-workflows
+    prompt: "Write interaction tests for keyboard navigation and review accessibility."
     should:
-      - accessibility-review
+      - {name: frontend-testing, agent: codex, scope: repo}
+      - {name: accessibility-review, agent: codex, scope: repo}
 
-  - id: unrelated-readme
-    prompt: "Fix the typo in the README."
+  # Add an explicit broad-skill negative here when measuring a broad/specific pair.
+  - id: specific-keyboard-review
+    prompt: "Only audit keyboard focus order; do not implement a new React component."
+    should:
+      - {name: accessibility-review, agent: codex, scope: repo}
     should_not:
-      - deployment
-      - accessibility-review
+      - {name: react-patterns, agent: codex, scope: repo}
 
-gates:
-  min_precision: 0.80
-  min_recall: 0.80
+  - id: negation
+    prompt: "Add frontend tests, but do not deploy anything."
+    should:
+      - {name: frontend-testing, agent: codex, scope: repo}
+    should_not:
+      - {name: deployment, agent: codex, scope: repo}
+
+  - id: japanese
+    prompt: "Reactのログインフォームを実装し、テストとキーボード操作の確認もしてください。"
+    should:
+      - {name: react-patterns, agent: codex, scope: repo}
+      - {name: frontend-testing, agent: codex, scope: repo}
+      - {name: accessibility-review, agent: codex, scope: repo}
+
+  - id: mixed-language
+    prompt: "React formのkeyboard accessibilityをレビューしてください。Deploymentは不要です。"
+    should:
+      - {name: accessibility-review, agent: codex, scope: repo}
+    should_not:
+      - {name: deployment, agent: codex, scope: repo}
+
+# Optional micro-metric gates. CLI flags override these fields individually.
+# gates:
+#   min_precision: 0.90
+#   min_recall: 0.90
