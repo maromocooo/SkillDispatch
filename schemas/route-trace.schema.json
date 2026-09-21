@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skilldispatch.dev/schemas/route-trace-v1.json",
+  "title": "SkillDispatch Route Trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "traceId",
+    "timestamp",
+    "agent",
+    "mode",
+    "prompt",
+    "catalog",
+    "router",
+    "policy",
+    "decisions",
+    "selected"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "traceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "agent": {
+      "enum": ["codex", "claude-code", "generic"]
+    },
+    "mode": {
+      "enum": ["shadow", "advisory", "enforce"]
+    },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storage"],
+      "properties": {
+        "storage": {
+          "enum": ["none", "hash", "raw"]
+        },
+        "hash": {
+          "type": "string"
+        },
+        "raw": {
+          "type": "string"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "cwd": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "skillCount"],
+      "properties": {
+        "fingerprint": {
+          "type": "string"
+        },
+        "skillCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "router": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "latencyMs"],
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "latencyMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "requestCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threshold", "maxSkills"],
+      "properties": {
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxSkills": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skillId", "name", "probability", "selected"],
+        "properties": {
+          "skillId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "reasonCode": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["code", "level", "message"],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "level": {
+            "enum": ["info", "warning", "error"]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

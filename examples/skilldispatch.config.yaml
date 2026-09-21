@@ -1,0 +1,29 @@
+# SkillDispatch example configuration
+
+mode: shadow
+
+router:
+  provider: jev
+  model: jev-latest
+  chunkSize: 48
+  concurrency: 2
+  timeoutMs: 2500
+
+policy:
+  threshold: 0.75
+  maxSkills: 4
+  ambiguityBand:
+    min: 0.55
+    max: 0.75
+
+discovery:
+  agents:
+    - codex
+    - claude-code
+  includeDisabled: false
+
+telemetry:
+  prompt: hash
+  tracePath: ~/.local/share/skilldispatch/traces.jsonl
+
+debug: false

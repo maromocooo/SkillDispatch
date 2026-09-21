@@ -1,0 +1,29 @@
+version: 1
+
+skills:
+  # Optional. If omitted, use currently discovered skills.
+  use_discovered: true
+
+cases:
+  - id: react-login
+    prompt: "Implement the React login form and add tests."
+    should:
+      - react-patterns
+      - frontend-testing
+    should_not:
+      - deployment
+
+  - id: keyboard-accessibility
+    prompt: "Check whether this form works using only the keyboard and fix the issues."
+    should:
+      - accessibility-review
+
+  - id: unrelated-readme
+    prompt: "Fix the typo in the README."
+    should_not:
+      - deployment
+      - accessibility-review
+
+gates:
+  min_precision: 0.80
+  min_recall: 0.80

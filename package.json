@@ -1,0 +1,47 @@
+{
+  "name": "skilldispatch",
+  "version": "0.1.0-dev.1",
+  "description": "Universal, observable skill routing for coding agents.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maromocooo/SkillDispatch.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.17.1",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "examples",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "smol-toml": "^1.4.2",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "@types/node": "^20.19.0",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.6"
+  }
+}
