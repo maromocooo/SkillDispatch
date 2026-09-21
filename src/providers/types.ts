@@ -3,7 +3,7 @@ import type { AgentKind, SkillDescriptor } from "../core/types.js";
 /** Metadata-only boundary; never includes SKILL.md bodies or arbitrary metadata. */
 export type RoutingCandidate = Pick<
   SkillDescriptor,
-  "id" | "name" | "description" | "scope"
+  "id" | "name" | "description" | "scope" | "agent"
 >;
 
 export interface ProviderRouteInput {

@@ -42,11 +42,12 @@ export async function route(
   };
   const candidates = request.skills
     .filter((skill) => skill.enabled)
-    .map(({ id, name, description, scope }) => ({
+    .map(({ id, name, description, scope, agent }) => ({
       id,
       name,
       description,
       scope,
+      agent,
     }))
     .sort((a, b) => compareText(a.id, b.id));
   if (!candidates.length) return result;

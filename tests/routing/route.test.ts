@@ -28,6 +28,49 @@ const request = (skills: SkillDescriptor[]): RouteRequest => ({
 });
 
 describe("routing and mock provider", () => {
+  it("passes each candidate's host agent independently of the request agent", async () => {
+    const codex: SkillDescriptor = {
+      ...skill("security-review"),
+      id: "codex-skill",
+      agent: "codex",
+    };
+    const claude: SkillDescriptor = {
+      ...skill("security-review"),
+      id: "claude-skill",
+      agent: "claude-code",
+    };
+    const judge = vi.fn<RouterProvider["judge"]>(async (input) => ({
+      decisions: input.candidates.map((candidate) => ({
+        skillId: candidate.id,
+        probability: 0.9,
+      })),
+    }));
+    const result = await route(request([codex, claude]), {
+      name: "spy",
+      judge,
+    });
+    expect(judge.mock.calls[0]?.[0].agent).toBe("generic");
+    expect(judge.mock.calls[0]?.[0].candidates).toEqual([
+      {
+        id: "claude-skill",
+        name: "security-review",
+        description: "security review",
+        scope: "repo",
+        agent: "claude-code",
+      },
+      {
+        id: "codex-skill",
+        name: "security-review",
+        description: "security review",
+        scope: "repo",
+        agent: "codex",
+      },
+    ]);
+    expect(result.selected.map((decision) => decision.skillId)).toEqual([
+      "claude-skill",
+      "codex-skill",
+    ]);
+  });
   it("uses independent fixture probabilities for zero-to-many selection", async () => {
     const scores = JSON.parse(
       await readFile(
@@ -60,7 +103,13 @@ describe("routing and mock provider", () => {
       { name: "spy", judge },
     );
     expect(judge.mock.calls[0]?.[0].candidates).toEqual([
-      { id: "active", name: "active", description: "active", scope: "repo" },
+      {
+        id: "active",
+        name: "active",
+        description: "active",
+        scope: "repo",
+        agent: "generic",
+      },
     ]);
     expect(JSON.stringify(judge.mock.calls)).not.toContain(
       "must-not-reach-provider",

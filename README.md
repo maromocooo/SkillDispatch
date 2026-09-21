@@ -198,8 +198,8 @@ tests/
 
 IDs hash `agent + canonical path`; content hashes use the original file text.
 Renaming/moving a file changes its ID; editing content changes only its hash.
-Core imports no agent adapter or SDK. Providers receive IDs, names, descriptions
-and scopes, never skill bodies or arbitrary frontmatter. One decision per eligible
+Core imports no agent adapter or SDK. Providers receive IDs, names, descriptions,
+scopes and each candidate's host agent, never skill bodies or arbitrary frontmatter. One decision per eligible
 candidate is required; malformed, missing or duplicate decisions fail open.
 Provider exceptions and timeouts likewise return no recommendations. Providers
 must honor the abort signal to cancel their own work after a timeout.
