@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClaudeInput } from "../../src/hooks/claude.js";
@@ -356,4 +356,21 @@ it("records unexpected route exceptions after safe setup", async () => {
       expect.objectContaining({ code: "hook_runtime_failed" }),
     ]),
   });
+});
+
+it("protects the key even when data and trace paths use different parent aliases", async () => {
+  const f = await setup();
+  await runShadowHook(f.input, f.environment);
+  const keyPath = join(f.data, "install.key");
+  const original = await readFile(keyPath);
+  const alias = join(f.ctx.root, "alias");
+  await symlink(f.ctx.root, alias);
+  f.environment.env.SKILLDISPATCH_DATA_DIR = join(alias, "private-data");
+  await write(
+    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    `router: {provider: mock}\ntelemetry:\n  tracePath: ${keyPath}\n`,
+  );
+  await runShadowHook(f.input, f.environment);
+  expect(await readFile(keyPath)).toEqual(original);
+  expect((await f.traces()).length).toBe(1);
 });

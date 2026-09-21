@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { route } from "../core/route.js";
 import type { RouteResult } from "../core/types.js";
@@ -50,6 +51,9 @@ export async function runShadowHook(
     // A configured trace destination must never append JSON into the installation key.
     if (path === join(directory, "install.key")) return;
     const key = await services.getKey(directory);
+    // Parent aliases (for example /tmp and /private/tmp) can name the same key.
+    const keyPath = await realpath(join(directory, "install.key"));
+    if ((await realpath(path).catch(() => undefined)) === keyPath) return;
     const sink = services.makeSink(path);
     const failed = (code: string): RouteResult => ({
       selected: [],
