@@ -21,6 +21,7 @@ describe("SkillDispatch configuration", () => {
     const ctx = await workspace();
     const { config, diagnostics } = await loadConfig(ctx);
     expect(config).toEqual({
+      telemetry: { enabled: true, prompt: "hash" },
       router: {
         provider: "jev",
         timeoutMs: 2500,

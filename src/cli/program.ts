@@ -1,12 +1,18 @@
+import type { Readable } from "node:stream";
 import { Command, Option } from "commander";
 import { VERSION } from "../version.js";
 import { discoverCommand } from "./commands/discover.js";
 import { evalCommand } from "./commands/eval.js";
+import { hookCommand } from "./commands/hook.js";
 import { routeCommand } from "./commands/route.js";
 import type { CliEnvironment } from "./context.js";
 import type { CliIO } from "./output.js";
 
-export function createProgram(environment: CliEnvironment, io: CliIO): Command {
+export function createProgram(
+  environment: CliEnvironment,
+  io: CliIO,
+  stdin: Readable = process.stdin,
+): Command {
   const program = new Command()
     .name("skilldispatch")
     .description("Universal, observable skill routing for coding agents.")
@@ -66,5 +72,17 @@ export function createProgram(environment: CliEnvironment, io: CliIO): Command {
       "minimum labeled micro precision for a passing CI gate",
     )
     .action((file, options) => evalCommand(file, options, environment, io));
+  const hook = program
+    .command("hook")
+    .description(
+      "Run a silent shadow UserPromptSubmit hook from bounded stdin; never inject context",
+    );
+  for (const host of ["codex", "claude"] as const)
+    hook
+      .command(host)
+      .description(
+        `Shadow route ${host} skills and append a private local trace`,
+      )
+      .action(() => hookCommand(host, environment, stdin));
   return program;
 }

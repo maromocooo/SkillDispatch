@@ -148,7 +148,7 @@ describe("skilldispatch CLI", () => {
     ["route", " "],
     ["route", "test", "--threshold", "nan"],
     ["route", "test", "--max-skills", "1.5"],
-    ["hook", "codex"],
+    ["hook", "unsupported"],
   ])("rejects invalid arguments %j", async (...args) => {
     await expect(run(args, await workspace())).rejects.toThrow();
   });

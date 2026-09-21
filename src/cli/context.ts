@@ -1,17 +1,14 @@
-import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import { loadConfig } from "../config/load.js";
 import {
   type DiscoveryAgent,
   maxSkillsSchema,
   probabilitySchema,
 } from "../config/schema.js";
-import { finalizeCatalog } from "../discovery/catalog.js";
-import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
-import { CodexDiscoveryAdapter } from "../discovery/codex.js";
-import type { DiscoveryAdapter } from "../discovery/types.js";
-import { JevRouterProvider } from "../providers/jev.js";
-import { MockRouterProvider } from "../providers/mock.js";
+import {
+  createProvider,
+  loadRuntimeContext,
+  type RuntimeEnvironment,
+} from "../runtime/context.js";
 
 export interface CliOptions {
   agent?: DiscoveryAgent;
@@ -22,23 +19,21 @@ export interface CliOptions {
   maxSkills?: string;
 }
 
-export interface CliEnvironment {
-  cwd: string;
-  home: string;
-  env: Readonly<Record<string, string | undefined>>;
-}
+export type CliEnvironment = RuntimeEnvironment;
 
 /** The CLI is the composition root; domain code never chooses an agent/provider. */
 export async function discoverForCommand(
   options: CliOptions,
   environment: CliEnvironment,
 ) {
-  const cwd = await realpath(resolve(environment.cwd, options.cwd ?? "."));
-  const { config, diagnostics } = await loadConfig({
-    cwd,
-    home: environment.home,
-    ...(options.config === undefined ? {} : { configPath: options.config }),
-  });
+  const context = await loadRuntimeContext(
+    { ...environment, cwd: resolve(environment.cwd, options.cwd ?? ".") },
+    {
+      ...(options.config === undefined ? {} : { configPath: options.config }),
+      ...(options.agent === undefined ? {} : { agent: options.agent }),
+    },
+  );
+  const { config } = context;
   if (options.threshold !== undefined) {
     const parsed = probabilitySchema.safeParse(
       options.threshold.trim() ? Number(options.threshold) : Number.NaN,
@@ -53,26 +48,7 @@ export async function discoverForCommand(
       throw new Error("--max-skills must be a positive integer.");
     config.policy.maxSkills = parsed.data;
   }
-  const agents = options.agent ? [options.agent] : config.discovery.agents;
-  const adapters: Record<DiscoveryAgent, DiscoveryAdapter> = {
-    codex: new CodexDiscoveryAdapter(),
-    "claude-code": new ClaudeDiscoveryAdapter(),
-  };
-  const results = await Promise.all(
-    agents.map((agent) =>
-      adapters[agent].discover({
-        cwd,
-        home: environment.home,
-        env: environment.env,
-      }),
-    ),
-  );
-  return {
-    cwd,
-    config,
-    agents,
-    catalog: finalizeCatalog([{ skills: [], diagnostics }, ...results]),
-  };
+  return context;
 }
 
 /** Shared route/eval composition: config, catalog, provider and requesting agent. */
@@ -81,14 +57,7 @@ export async function routingForCommand(
   environment: CliEnvironment,
 ) {
   const context = await discoverForCommand(options, environment);
-  const apiKey = environment.env.TYPESAFE_API_KEY;
-  const provider =
-    context.config.router.provider === "mock"
-      ? new MockRouterProvider(context.config.router.mock)
-      : new JevRouterProvider({
-          ...context.config.router.jev,
-          ...(apiKey === undefined ? {} : { apiKey }),
-        });
+  const provider = createProvider(context.config, environment);
   return {
     ...context,
     provider,

@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type { RoutingPolicy } from "../core/types.js";
 import {
@@ -17,6 +18,20 @@ export const maxSkillsSchema = z
   .max(Number.MAX_SAFE_INTEGER);
 
 export const configFileSchema = z.object({
+  telemetry: z
+    .object({
+      enabled: z.boolean().optional(),
+      prompt: z.enum(["none", "hash", "raw"]).optional(),
+      tracePath: z
+        .string()
+        .min(1)
+        .refine(
+          (path) =>
+            !path.includes("\0") && (isAbsolute(path) || path.startsWith("~/")),
+        )
+        .optional(),
+    })
+    .optional(),
   router: z
     .object({
       provider: z.enum(["jev", "mock"]).optional(),
@@ -42,6 +57,11 @@ export const configFileSchema = z.object({
 });
 
 export interface SkillDispatchConfig {
+  telemetry: {
+    enabled: boolean;
+    prompt: "none" | "hash" | "raw";
+    tracePath?: string;
+  };
   router: {
     provider: "jev" | "mock";
     timeoutMs: number;
@@ -53,6 +73,7 @@ export interface SkillDispatchConfig {
 }
 
 export const defaultConfig = (): SkillDispatchConfig => ({
+  telemetry: { enabled: true, prompt: "hash" },
   router: {
     provider: "jev",
     timeoutMs: 2500,

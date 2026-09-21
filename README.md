@@ -358,6 +358,13 @@ See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
 ## Development
 
+`skilldispatch hook codex` and `skilldispatch hook claude` now read bounded
+UserPromptSubmit JSON from stdin, discover only that host's catalog at the input
+CWD, and write a shadow trace. Both succeed silently, including on errors.
+`telemetry.enabled` defaults to true and `telemetry.prompt` to `hash`; only hooks
+persist traces. Set `telemetry.enabled: false` to skip shadow routing and storage.
+
+
 The public `routeTraceSchema` defines the new shadow-only Route Trace v1 contract
 in `schemas/route-trace.schema.json`. `selected` means selected by SkillDispatch's
 policy, not observed host invocation. Trace construction projects only safe fields;

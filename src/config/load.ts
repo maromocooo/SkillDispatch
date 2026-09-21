@@ -54,6 +54,8 @@ export async function loadConfig(options: {
         path,
       });
     const file = parsed.data;
+    if (file.telemetry !== undefined)
+      Object.assign(config.telemetry, file.telemetry);
     if (file.router?.provider !== undefined)
       config.router.provider = file.router.provider;
     if (file.router?.timeoutMs !== undefined)
