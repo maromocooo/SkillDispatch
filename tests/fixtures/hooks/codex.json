@@ -1,0 +1,10 @@
+{
+  "session_id": "codex-session-fixture",
+  "turn_id": "codex-turn-fixture",
+  "cwd": "/fixture/project",
+  "hook_event_name": "UserPromptSubmit",
+  "model": "gpt-fixture",
+  "permission_mode": "default",
+  "prompt": "PRIVATE_HOOK_PROMPT_SENTINEL",
+  "transcript_path": "/PRIVATE_TRANSCRIPT_DO_NOT_READ.jsonl"
+}

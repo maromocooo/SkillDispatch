@@ -1,0 +1,9 @@
+{
+  "session_id": "claude-session-fixture",
+  "cwd": "/fixture/project",
+  "hook_event_name": "UserPromptSubmit",
+  "permission_mode": "default",
+  "prompt": "PRIVATE_HOOK_PROMPT_SENTINEL",
+  "transcript_path": "/PRIVATE_TRANSCRIPT_DO_NOT_READ.jsonl",
+  "prompt_id": "claude-prompt-fixture"
+}
