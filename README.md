@@ -202,10 +202,20 @@ tests/
 IDs hash `agent + canonical path`; content hashes use the original file text.
 Renaming/moving a file changes its ID; editing content changes only its hash.
 Core imports no agent adapter or SDK. Providers receive IDs, names, descriptions,
-scopes and each candidate's host agent, never skill bodies or arbitrary frontmatter. One decision per eligible
-candidate is required; malformed, missing or duplicate decisions fail open.
-Provider exceptions and timeouts likewise return no recommendations. Providers
-must honor the abort signal to cancel their own work after a timeout.
+scopes and each candidate's host agent, never skill bodies or arbitrary frontmatter.
+`ProviderRouteOutput.completeness` is required:
+
+- `complete`: exactly one decision per eligible candidate, no failed IDs.
+- `partial`: decisions and `failedSkillIds` partition the candidates; at least one
+  failed ID is required. Policy uses successful decisions. A `provider_partial`
+  diagnostic lists unevaluated IDs in `skillIds`; no scores are invented for them.
+- Malformed: missing, unknown, duplicate or overlapping IDs, invalid probabilities
+  or invalid completeness fail open with `invalid_provider_response` and no decisions.
+
+Providers may supply safe domain diagnostics. Provider exceptions and overall
+route timeouts still return no recommendations. Providers must honor the abort
+signal and return a valid partial result before that deadline to retain successes.
+See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
 ## Development and PR2
 

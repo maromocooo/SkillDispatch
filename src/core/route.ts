@@ -5,9 +5,26 @@ import type {
 } from "../providers/types.js";
 import { compareText } from "./order.js";
 import { applyPolicy, DEFAULT_POLICY, validatePolicy } from "./policy.js";
-import type { RouteRequest, RouteResult, RoutingPolicy } from "./types.js";
+import type {
+  Diagnostic,
+  RouteRequest,
+  RouteResult,
+  RoutingPolicy,
+} from "./types.js";
 
 const outputSchema = z.object({
+  completeness: z.enum(["complete", "partial"]),
+  failedSkillIds: z.array(z.string()).optional(),
+  diagnostics: z
+    .array(
+      z.object({
+        code: z.string().min(1),
+        level: z.enum(["info", "warning", "error"]),
+        message: z.string().min(1),
+        skillIds: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
   decisions: z.array(
     z.object({
       skillId: z.string(),
@@ -89,18 +106,12 @@ export async function route(
       return result;
     }
     const parsed = outputSchema.safeParse(output);
-    if (
-      !parsed.success ||
-      parsed.data.decisions.length !== candidates.length ||
-      new Set(parsed.data.decisions.map((d) => d.skillId)).size !==
-        candidates.length ||
-      parsed.data.decisions.some((d) => !names.has(d.skillId))
-    ) {
+    if (!parsed.success || !hasValidCoverage(parsed.data, names)) {
       result.diagnostics.push({
         code: "invalid_provider_response",
         level: "warning",
         message:
-          "Provider must return one valid probability per candidate; continue without recommendations.",
+          "Provider result violates the routing contract; continue without recommendations.",
       });
       return result;
     }
@@ -113,6 +124,36 @@ export async function route(
         : { reasonCode: decision.reasonCode }),
     }));
     Object.assign(result, applyPolicy(scored, policy));
+    if (parsed.data.completeness === "partial") {
+      result.diagnostics.push({
+        code: "provider_partial",
+        level: "warning",
+        message:
+          "Provider result is partial; listed skills were not evaluated. Recommendations use successful decisions only.",
+        skillIds: [...(parsed.data.failedSkillIds ?? [])].sort(compareText),
+      });
+    }
+    const providerDiagnostics: Diagnostic[] = (
+      parsed.data.diagnostics ?? []
+    ).map((diagnostic) => ({
+      code: diagnostic.code,
+      level: diagnostic.level,
+      message: diagnostic.message,
+      ...(diagnostic.skillIds === undefined
+        ? {}
+        : { skillIds: [...diagnostic.skillIds].sort(compareText) }),
+    }));
+    const diagnosticKey = (diagnostic: Diagnostic) =>
+      JSON.stringify([
+        diagnostic.code,
+        diagnostic.level,
+        diagnostic.message,
+        diagnostic.skillIds ?? null,
+      ]);
+    providerDiagnostics.sort((a, b) =>
+      compareText(diagnosticKey(a), diagnosticKey(b)),
+    );
+    result.diagnostics.push(...providerDiagnostics);
     if (parsed.data.model !== undefined)
       result.router.model = parsed.data.model;
     return result;
@@ -120,4 +161,33 @@ export async function route(
     if (timer !== undefined) clearTimeout(timer);
     result.router.latencyMs = Math.max(0, performance.now() - started);
   }
+}
+
+/** Successful and failed IDs must partition the eligible input catalog exactly. */
+function hasValidCoverage(
+  output: z.infer<typeof outputSchema>,
+  candidates: ReadonlyMap<string, string>,
+): boolean {
+  const failedIds = output.failedSkillIds ?? [];
+  if (
+    output.completeness === "complete"
+      ? failedIds.length !== 0
+      : failedIds.length === 0
+  )
+    return false;
+  const accountedFor = new Set<string>();
+  for (const id of [
+    ...output.decisions.map((decision) => decision.skillId),
+    ...failedIds,
+  ]) {
+    if (!candidates.has(id) || accountedFor.has(id)) return false;
+    accountedFor.add(id);
+  }
+  if (accountedFor.size !== candidates.size) return false;
+  return (output.diagnostics ?? []).every((diagnostic) => {
+    const ids = diagnostic.skillIds ?? [];
+    return (
+      new Set(ids).size === ids.length && ids.every((id) => candidates.has(id))
+    );
+  });
 }

@@ -47,6 +47,7 @@ export class MockRouterProvider implements RouterProvider {
     input.signal?.throwIfAborted();
     const promptTokens = tokens(input.prompt);
     return {
+      completeness: "complete",
       decisions: input.candidates.map((candidate) => {
         const configured = Object.hasOwn(this.scores, candidate.id)
           ? this.scores[candidate.id]

@@ -40,6 +40,7 @@ describe("routing and mock provider", () => {
       agent: "claude-code",
     };
     const judge = vi.fn<RouterProvider["judge"]>(async (input) => ({
+      completeness: "complete",
       decisions: input.candidates.map((candidate) => ({
         skillId: candidate.id,
         probability: 0.9,
@@ -93,6 +94,7 @@ describe("routing and mock provider", () => {
   });
   it("never passes disabled skills or arbitrary metadata to providers", async () => {
     const judge = vi.fn<RouterProvider["judge"]>(async (input) => ({
+      completeness: "complete",
       decisions: input.candidates.map((s) => ({
         skillId: s.id,
         probability: 0.9,
@@ -167,7 +169,7 @@ describe("routing and mock provider", () => {
   )("fails open on malformed provider output (%j)", async ({ decisions }) => {
     const result = await route(request([skill("a")]), {
       name: "bad",
-      judge: async () => ({ decisions }),
+      judge: async () => ({ completeness: "complete", decisions }),
     });
     expect(result.selected).toEqual([]);
     expect(result.diagnostics[0]?.code).toBe("invalid_provider_response");
