@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { route } from "../core/route.js";
 import type { RouteResult } from "../core/types.js";
 import type { RouterProvider } from "../providers/types.js";
@@ -45,7 +46,10 @@ export async function runShadowHook(
     const { config, catalog, cwd } = context;
     if (!config.telemetry.enabled) return;
     const path = tracePath(environment, config.telemetry.tracePath);
-    const key = await services.getKey(dataDirectory(environment));
+    const directory = dataDirectory(environment);
+    // A configured trace destination must never append JSON into the installation key.
+    if (path === join(directory, "install.key")) return;
+    const key = await services.getKey(directory);
     const sink = services.makeSink(path);
     const failed = (code: string): RouteResult => ({
       selected: [],

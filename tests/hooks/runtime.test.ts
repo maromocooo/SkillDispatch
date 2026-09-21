@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClaudeInput } from "../../src/hooks/claude.js";
@@ -303,5 +303,57 @@ describe("shared silent shadow runtime", () => {
       decisions: [],
       catalog: { skillCount: 0, enabledSkillCount: 0 },
     });
+  });
+});
+
+it("does not corrupt the reserved installation key when tracePath points to it", async () => {
+  const f = await setup();
+  await mkdir(f.data, { mode: 0o700 });
+  const keyPath = join(f.data, "install.key");
+  const key = Buffer.alloc(32, 7);
+  await writeFile(keyPath, key, { mode: 0o600 });
+  await write(
+    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    `telemetry:\n  tracePath: ${keyPath}\n`,
+  );
+  await runShadowHook(f.input, f.environment);
+  expect(await readFile(keyPath)).toEqual(key);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("uses the configured trace path and survives a real trace-file failure", async () => {
+  const f = await setup();
+  const path = join(f.ctx.root, "alternate/events.jsonl");
+  await write(
+    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    `router: {provider: mock}\ntelemetry:\n  tracePath: ${path}\n`,
+  );
+  await runShadowHook(f.input, f.environment);
+  expect(JSON.parse(await readFile(path, "utf8")).outcome).toBe("complete");
+  await expect(f.traces()).rejects.toThrow();
+  await write(
+    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    `router: {provider: mock}\ntelemetry:\n  tracePath: ${f.ctx.root}\n`,
+  );
+  await expect(runShadowHook(f.input, f.environment)).resolves.toBeUndefined();
+});
+
+it("records unexpected route exceptions after safe setup", async () => {
+  const f = await setup();
+  const { loadRuntimeContext } = await import("../../src/runtime/context.js");
+  const context = await loadRuntimeContext(
+    { ...f.environment, cwd: f.input.cwd },
+    { agent: f.input.agent },
+  );
+  // Duplicate IDs trigger a core input exception, not an SDK diagnostic.
+  context.catalog.skills.push(...context.catalog.skills);
+  await runShadowHook(f.input, f.environment, {
+    loadContext: async () => context,
+  });
+  expect((await f.traces())[0]).toMatchObject({
+    outcome: "failed",
+    diagnostics: expect.arrayContaining([
+      expect.objectContaining({ code: "hook_runtime_failed" }),
+    ]),
   });
 });
