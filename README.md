@@ -264,6 +264,13 @@ See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
 ## Development
 
+The library also exports `parseEvalYaml`, `loadEvalFile`, and `runEvaluation`.
+Evaluation resolves every expected skill against a catalog before routing any
+case, then reuses `route()` with the supplied provider and policy. Results omit
+prompts and diagnostic messages. Micro precision counts labeled predictions only;
+recall counts expected positives, and undefined ratios are `null`. Fully labeled
+cases alone contribute to exact-set accuracy. Provider failures remain in metrics.
+
 ```sh
 pnpm test
 pnpm typecheck

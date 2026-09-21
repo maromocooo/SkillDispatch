@@ -8,6 +8,11 @@ export { CodexDiscoveryAdapter } from "./discovery/codex.js";
 export type { ParseSkillContext } from "./discovery/parse-skill.js";
 export { parseSkill } from "./discovery/parse-skill.js";
 export type * from "./discovery/types.js";
+export type { EvaluationOptions } from "./eval/runner.js";
+export { runEvaluation } from "./eval/runner.js";
+export type { EvalDataset, EvalGates, SkillSelector } from "./eval/schema.js";
+export { EvalInputError, loadEvalFile, parseEvalYaml } from "./eval/schema.js";
+export type * from "./eval/types.js";
 export type {
   JevCall,
   JevProviderOptions,
