@@ -1,6 +1,6 @@
 # Architecture
 
-## Implemented PR1 boundary
+## Implemented PR1 / PR1.1 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
 library and CLI entry points. Only discovery and offline mock routing are active.
@@ -16,16 +16,19 @@ cli/program + commands
   -> providers/mock (chosen by the CLI composition root)
 ```
 
-`RouterProvider.judge` is the provider contract. Each eligible candidate receives
-one independent probability; a single-choice interface is intentionally absent.
+`RouterProvider.judge` is the provider contract. Every eligible candidate must be
+accounted for as one independent probability or an explicitly failed evaluation.
 The coordinator removes disabled skills before crossing that boundary and
-validates the full response before applying the pure policy. Scores outside
-0..1, missing IDs, unknown IDs and duplicate IDs fail open. Timeout uses an abort
-signal and returns a diagnostic; future providers must cancel their own work.
+validates coverage/completeness before applying policy to successful decisions.
+Malformed results fail open; valid partial results preserve successes. An overall
+timeout uses an abort signal; future providers must cancel their own work.
 
 Discovery normalizes canonical paths, hashes agent/path identity independently
-of content, and retains name collisions. Host-specific fallback fields and
-invocation restrictions stay in adapters. Generic parsing and traversal do not
+of content, and retains same-name skills. Duplicate-name diagnostics group by
+agent and whitespace-normalized name (case-sensitive), not name alone. Skills
+belonging to different host agents are distinct even when their names match.
+Host-specific fallback fields and invocation restrictions stay in adapters.
+Generic parsing and traversal do not
 execute skill content. Scan order is recorded as source metadata; it is not a
 promise that every host will resolve collisions identically.
 
@@ -81,7 +84,49 @@ interface RouterProvider {
   name: string;
   judge(input: ProviderRouteInput): Promise<ProviderRouteOutput>;
 }
+
+interface ProviderRouteOutput {
+  decisions: ProviderDecision[];
+  completeness: "complete" | "partial";
+  failedSkillIds?: string[];
+  diagnostics?: ProviderDiagnostic[];
+  model?: string;
+}
 ```
+
+Each `RoutingCandidate` contains `id`, `name`, `description`, `scope`, and `agent`.
+The request-level `agent` describes the caller; it does not override a candidate's
+host identity. No host hook payloads or provider SDK types enter this contract.
+
+The contract is checked against the **enabled input candidate IDs**:
+
+| Result | Required coverage | Routing behavior |
+| --- | --- | --- |
+| `complete` | Exactly one decision per candidate; failed IDs absent or empty | Apply policy to all decisions |
+| `partial` | Decisions and failed IDs form a disjoint, duplicate-free partition of all candidates; at least one failed ID | Apply policy only to successful decisions |
+| Malformed | Invalid shape/probability/completeness, unknown or duplicate IDs, overlap, or uncovered candidates | Return empty `selected` and `allDecisions`, with `invalid_provider_response` |
+
+For example, decisions `A=0.95`, `B=0.82`, `D=0.10` and failed ID `C` are a valid
+partial result for candidates A–D. A threshold of 0.75 selects A and B. C receives
+no fabricated decision or zero score. `RouteResult.diagnostics` contains
+`{ code: "provider_partial", level: "warning", message: "...", skillIds: ["C"] }`.
+An all-failed result is also valid partial output with no decisions. A result
+with no failures must declare `complete`. Omitting `completeness` is malformed;
+the mock always supplies `complete`.
+
+`ProviderDiagnostic` reuses the domain's `code`, `level`, `message`, and optional
+`skillIds`. Referenced IDs must be unique and belong to the eligible candidates.
+Providers must supply safe messages, never raw SDK errors, prompts, API keys, or
+environment values. Invalid output is rejected before its diagnostics/model are
+forwarded. After validation, the core emits its partial diagnostic first, then
+provider diagnostics in deterministic code/level/message/ID order. Diagnostic
+skill IDs are sorted; selection still uses probability/name/ID ordering. Input
+objects are not mutated, and measured latency remains nondeterministic.
+
+A provider exception or overall route timeout still fails open with
+`provider_failed` or `provider_timeout`. To preserve successes, a future provider
+must account for failures and return valid partial output before the overall
+deadline. This contract introduces no chunking, concurrency, network or telemetry.
 
 ### RoutingPolicy
 
@@ -113,9 +158,9 @@ build RouteRequest
     ↓
 provider.judge()
     ↓
-normalize probabilities
+validate completeness, ID coverage and probabilities
     ↓
-applyPolicy()
+applyPolicy(successful decisions)
     ↓
 emit trace
     ↓
@@ -126,6 +171,7 @@ hook adapter response
 
 - discovery partial failure: continue with successfully discovered skills + diagnostics;
 - zero skills: return empty route immediately;
+- valid partial provider response: retain successful decisions and diagnose failed IDs;
 - Jev timeout/network failure: fail open;
 - malformed provider response: fail open + diagnostic;
 - telemetry failure: ignore for prompt path;
