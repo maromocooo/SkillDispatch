@@ -1,6 +1,6 @@
 # PR4 validation — Shadow hooks and local routing traces
 
-Validated on 2026-09-21–22 (JST), macOS. Base main:
+Validated on 2026-09-21–22 (JST), macOS; review hardening revalidated on 2026-09-22. Base main:
 `0ffbd9c13aad6b3aac8be04a518f37f727a5b136`. Implementation branch:
 `feat/pr4-shadow-hooks-traces`. The SDK remains exactly `@typesafe-ai/sdk@0.6.0`;
 its transport, independent-Noul policy and concurrency ceiling are unchanged.
@@ -20,6 +20,40 @@ After push/fetch, main and origin/main matched the full base SHA above. Remote
 its local branch was deleted with `git branch -d`. PR4 was created from main.
 No new implementation was committed on main, and no force push, rebase, amend,
 reset or history rewrite was used.
+
+## Review hardening on the existing PR4 branch
+
+Started at `4e5c517731d0ad8aa39efdfaa43c9926b2aa3850`, after fetch/prune confirmed
+clean state and local/remote equality on `feat/pr4-shadow-hooks-traces`. This
+follow-up only adds commits to PR4; it does not merge PR4, change main or rewrite
+existing history. The PR3 integration above describes the earlier PR4 setup.
+
+The hook config policy now uses defaults plus the user layer only. The existing
+loader identifies each layer as user/project/explicit. `hook.trustProjectConfig`
+defaults to false and can only be set from
+`~/.config/skilldispatch/config.yaml`. Untrusted project `.skilldispatch.yaml` is
+skipped before filesystem access or parsing, including a self-trust declaration.
+Hook mode ignores explicit overrides; normal discover/route/eval retain the
+existing user → project → explicit order. Project skill discovery still uses
+hook CWD regardless of config trust.
+
+Opt-in example, **user config only**:
+
+```yaml
+hook:
+  trustProjectConfig: true
+```
+
+That opt-in permits ordinary project overrides of routing and telemetry, so it
+should only be used when those repositories are trusted. Without opt-in, a
+project cannot select a trace destination, enable raw storage, defeat user
+telemetry opt-out or switch an offline provider to an external one.
+
+The pre-release trace contract now uses `host.promptKey` instead of `turnKey`.
+Codex `turn_id` and optional Claude `prompt_id` map to a host-neutral
+`promptCorrelationId`. No raw ID is serialized. Missing legacy Claude IDs are
+omitted, never inferred. `schemaVersion` remains `1.0` because PR4 is unmerged
+and unreleased; pre-hardening development traces with turnKey no longer validate.
 
 ## Current host specifications reviewed
 
@@ -42,8 +76,10 @@ Official documentation/source was inspected before adapter implementation:
 | Claude Code | Required session_id, cwd, hook_event_name, permission_mode, prompt, transcript_path; optional prompt_id, scratchpad_dir, agent_id/agent_type, effort.level | Exit 0, no output. User/project settings.json. Timeout is seconds; this synchronous event blocks model processing. |
 
 The handoff's conceptual shared host shape is not copied into core. Current
-Claude optional `prompt_id` is validated but discarded, not invented as a turn
-ID. UserPromptSubmit supplies no current model/turn_id there. Codex supplies both.
+Claude optional `prompt_id` now provides submission correlation, consistent with
+the rechecked official common-input docs (v2.1.196+). UserPromptSubmit supplies no
+current model/turn_id there. Codex supplies turn_id/model. Neither wire field is
+added to the routing core; adapters map submission IDs to a neutral hook field.
 Unknown future fields are ignored rather than rejected; known field types and
 required fields are checked. Permission mode strings tolerate future values.
 Transcript paths are dropped by adapters and are never read or persisted.
@@ -75,9 +111,13 @@ HMAC-SHA256 uses a cryptographically random 32-byte installation key, with domai
 
 - `prompt\0` + exact prompt;
 - `session\0` + host agent + `\0` + session ID;
-- `turn\0` + host agent + `\0` + turn ID (only when supplied).
+- `host-prompt\0` + host agent + `\0` + submission ID (Codex turn_id / Claude prompt_id).
 
-This allows same-installation correlation while separating domains/hosts. It is
+`prompt.hash` identifies content: repeated text has the same hash. `host.promptKey`
+identifies the host submission: different IDs produce different keys even for
+identical text. Equal literal IDs on different hosts produce different keys.
+Legacy Claude inputs omit promptKey when prompt_id is absent. This allows
+same-installation correlation while separating domains/hosts. It is
 not an unsalted prompt digest, and never reuses TypeSafe credentials. Changing
 installation keys intentionally breaks correlation. Keys must not accompany
 shared traces. Prompt hashing affects local storage only; normal Jev requests
@@ -137,13 +177,13 @@ long for this intended prompt-path use. A hard cutoff may prevent trace emission
 
 ## Validation results
 
-All 283 pre-PR4 tests are retained, with **104 additional tests: 387 in 27 files**.
+All **387 pre-hardening tests** are retained, with **27 additional tests: 414 in 30 files**.
 The old unsupported-hook CLI test now rejects an unsupported host; valid hook
 commands have dedicated coverage.
 
 | Check | Node 20.20.2 | Node 24.12.0 |
 | --- | --- | --- |
-| `pnpm test` | 387 passed | 387 passed |
+| `pnpm test` | 414 passed | 414 passed |
 | `pnpm typecheck` | passed | passed |
 | `pnpm lint` | passed, no warnings | passed, no warnings |
 | `pnpm build` | passed | passed |
@@ -152,9 +192,9 @@ commands have dedicated coverage.
 | New shadow strict child-process tests | 5 passed | 5 passed |
 | Installed public CLI and trace smoke | passed | passed |
 
-pnpm 10.17.1. Tarballs were packed to `/tmp/skilldispatch-pr4-final-node20` and
-`/tmp/skilldispatch-pr4-final-node24`. The Node 20 artifact was installed offline
-into `/tmp/skilldispatch-pr4-install` with cached production dependencies, then
+pnpm 10.17.1. Tarballs were packed to `/tmp/skilldispatch-pr4-hardening-node20` and
+`/tmp/skilldispatch-pr4-hardening-node24`. The Node 20 artifact was installed offline
+into `/tmp/skilldispatch-pr4-hardening-install` with cached production dependencies, then
 its public executable was exercised under both runtimes, outside the checkout.
 No dev-only Ajv dependency is required by the installed runtime.
 
@@ -164,11 +204,15 @@ Installed smoke covered:
   with passing gates against synthetic skills/scores.
 - Both installed hook commands receiving current fixture shapes on stdin,
   writing version-1 JSONL, filtering by host and exiting 0 without output.
-- Actual directory/file permissions, key length, same-prompt correlation,
-  cross-host session separation and absent Claude model/turn keys.
+- Existing 0600 private-file contents/permissions unchanged under malicious
+  project settings, including self-trust. User telemetry opt-out and offline
+  provider preferences protected; explicit user trust enables safe temporary
+  project trace paths and raw opt-in.
+- Same-text/different-ID correlation, cross-host submission separation, current
+  Claude prompt_id and legacy absence, no raw IDs, and no retired turnKey field.
 - Missing credentials -> failed trace with `provider_setup_failed`, still empty
   success for hooks; ordinary route/eval still exit 1.
-- Invalid JSON, oversized/wrong-event input and invalid config -> empty success.
+- Invalid JSON, oversized/wrong-event input and invalid user config -> empty success.
 - Prompt/path/transcript/description/body/error sentinels absent from default
   JSONL. No route/eval/discover persistence even with telemetry enabled.
 - Shipped JSON Schema version, strictness and public telemetry exports.
@@ -182,11 +226,25 @@ unexpected runtime exceptions and throwing sinks. Stalled stdin is tested in
 the production CLI entry. Twelve concurrent child processes produce twelve
 parseable lines with one shared installation key and distinct trace IDs.
 
+The 27 new tests comprise 9 source-aware config tests, 10 two-host trust-boundary
+tests, 7 submission-correlation/parser tests and 1 retired-field schema rejection.
+They verify malformed project input is ignored without opt-in, user-only trust
+(including project/explicit attempts), user false/offline preferences with no
+fetch, exact private-file preservation, trusted safe-path application, legacy
+Claude behavior, stable text hashes, distinct submission keys and domain separation.
+The Zod/JSON Schema drift check remains active. Existing hook fixture configs now
+live in their temporary user layer so prior routing/failure tests exercise the
+same scenarios under the safer default.
+
 Normal tests use temporary homes/catalogs and fake calls/fetch. Existing SDK
 transport tests use **local loopback only** with explicit socket permission.
-Installed CLI smoke uses temporary project skills, explicit mock config, a
-separate data directory, an isolated Claude personal directory and a child env
-without API credentials; Codex may also discover native user/admin catalog roots.
+Installed CLI smoke uses temporary project skills and user config, a separate
+data directory and isolated home. A test-only Node preload overrides os.homedir
+and synchronizes builtin ESM exports, without changing HOME or real user settings.
+It also fakes fetch and records any attempted call: the marker stays absent in
+all trust/provider-protection cases. No real API credentials are passed; synthetic
+credentials are used only to test that an untrusted project cannot enable calls.
+Codex's native admin roots may still be discovered if present.
 No host settings were changed and no real Codex/Claude session was launched.
 **No live Jev call was performed in PR4.** No external TypeSafe API request is
 made by tests/CI/prepack; official documentation/GitHub checks used network access.
@@ -201,7 +259,7 @@ made by tests/CI/prepack; official documentation/GitHub checks used network acce
 - Independent Noul quality and thresholds remain uncalibrated. Shadow selections
   do not demonstrate host invocation, compliance, output quality or causality.
 - Text-only visibility and existing discovery/plugin/trust limitations remain.
-  Claude prompt-level IDs are intentionally not added to this first contract.
+  Claude prompt-level IDs are correlated only when supplied by the host.
 - JSONL is best effort, not an audit-grade durable log: disk failure, short write,
   process exit or hard timeout can drop an event or leave a partial trailing line.
   There is no rotation/retention manager; consumers must tolerate incomplete tails.

@@ -1,5 +1,9 @@
 # Copy to .skilldispatch.yaml or ~/.config/skilldispatch/config.yaml.
 # Supply TYPESAFE_API_KEY via the environment, never this file.
+# Hooks read user config only by default; project skill discovery still uses CWD.
+# This opt-in can only be set in ~/.config/skilldispatch/config.yaml:
+# hook:
+#   trustProjectConfig: true
 router:
   provider: jev
   timeoutMs: 2500

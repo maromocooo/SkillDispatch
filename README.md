@@ -429,7 +429,8 @@ Claude inputs without `prompt_id` omit promptKey rather than inventing an ID.
 The pre-release v1 schema replaces `turnKey` with `promptKey`; schemaVersion stays
 `1.0` because PR4 is not yet merged or publicly released. Old development traces
 using turnKey do not validate against the revised schema.
- New directories/files use 0700/0600 on POSIX.
+
+New directories/files use 0700/0600 on POSIX.
 Key creation is race-safe; an existing key is never replaced automatically.
 Unsafe permissions, symlink destinations, corrupt keys and I/O failures cause
 silent no-op behavior rather than exposing data or blocking the host. Back up
@@ -444,7 +445,7 @@ The catalog fingerprint ignores paths and path-derived IDs, includes enabled
 state, and preserves duplicate counts. Skill IDs themselves remain local identities.
 
 It does **not** store CWD, skill paths/directories/descriptions/bodies, transcript
-paths, raw session/turn IDs, diagnostic messages/stacks, SDK errors, API keys or
+paths, raw session/submission IDs, diagnostic messages/stacks, SDK errors, API keys or
 environment values. Allowed fields such as skill names are metadata, not an
 arbitrary-secret redaction mechanism. Prompt hashing protects local storage;
 **Jev still receives the prompt and permitted skill descriptions** as described

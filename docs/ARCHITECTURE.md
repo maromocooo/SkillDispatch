@@ -293,12 +293,13 @@ pipeline, not Jev semantics. No threshold tuning or alternate router is added.
 ## Shadow hooks (PR4)
 
 `hooks/codex.ts` and `hooks/claude.ts` translate current UserPromptSubmit wire
-objects into `{agent, cwd, prompt, sessionId, turnId?, model?}`. Zod object parsers
+objects into `{agent, cwd, prompt, sessionId, promptCorrelationId?, model?}`. Zod object parsers
 check required fields and known optional types, then strip unknown extensions.
 Codex requires session/turn/model, accepts a null transcript path, and discards
 agent_id/agent_type. Claude requires session/transcript/CWD/permission/event/prompt,
-validates current optional prompt_id/scratchpad/agent/effort fields, and discards
-them. Its prompt_id is not a turn identifier; no model or turn is invented.
+maps optional `prompt_id` to `promptCorrelationId` and discards unrelated common
+fields after type checking. Codex maps `turn_id` to that same neutral field.
+Legacy Claude inputs omit it; no model or submission ID is invented.
 Neither adapter reads a transcript or passes its path to the runtime.
 
 `hooks/stdin.ts` reads at most 1 MiB and waits at most one second for EOF. Invalid
@@ -307,6 +308,23 @@ no-ops before any provider request. `hooks/runtime.ts` loads config/discovery
 through `runtime/context.ts` using the **hook CWD**, forcing the host's single-agent
 catalog regardless of `discovery.agents`. Normal CLI can still use both agents.
 Disabled skills remain in counts/fingerprints but never become provider candidates.
+
+Config loading remains one implementation: `config/load.ts` labels each layer
+`user`, `project`, or `explicit`. Normal CLI retains defaults → user → project →
+explicit config. Hook runtime requests `mode: "hook"`: defaults → user only,
+unless the **user layer** sets `hook.trustProjectConfig: true` (default false).
+Untrusted project config is skipped before stat/read/parse, including malformed
+files and self-authorizing trust flags. Hook mode accepts no explicit layer;
+project/explicit layers can never change the user trust switch in any mode.
+Core domain types do not know config provenance.
+
+This isolates global hooks from repository-controlled trace paths, raw prompt
+persistence and network/provider changes. User opt-out and offline provider
+choices cannot be overridden by an untrusted project. Skill discovery still uses
+hook CWD: reading project skills is separate from trusting project runtime config.
+Explicit user opt-in delegates normal routing/telemetry overrides to project
+settings; it is not a per-repository trust registry. Invalid user config still
+fails open silently. See the README for the user-only opt-in example.
 
 The runtime creates private storage/key prerequisites, selects the existing
 provider, calls core `route()`, explicitly projects a trace and awaits the sink.
@@ -344,8 +362,11 @@ interface TraceSink {
 `schemas/route-trace.schema.json` is its shipped draft-2020-12 JSON Schema.
 Objects reject extra properties. Tests compare generated schema and validate
 emitted JSONL with a dev-only Ajv validator. This replaces the never-emitted
-handoff draft. Readers should dispatch by schemaVersion; incompatible changes
-after this release require an explicit new contract version.
+handoff draft. The pre-merge hardening replaces `host.turnKey` with
+`host.promptKey` while keeping `1.0`, since no public v1 release has shipped.
+Old development traces with turnKey are rejected by the revised strict schema.
+Readers should dispatch by schemaVersion; incompatible changes after release
+require an explicit new contract version.
 
 The allowlist projection includes trace UUID/time, agent/shadow mode, prompt
 storage discriminator, pseudonymous host keys/model, catalog fingerprint/counts,
@@ -362,7 +383,7 @@ skillIds identify missing evaluations. Otherwise routing is complete, including
 an empty eligible catalog requiring no judgments. Provider setup failures have
 latency 0; otherwise latency is route execution only, not whole-hook wall time.
 
-Raw prompt/session/turn IDs, CWD, transcript/skill paths, directories, descriptions,
+Raw prompt/session/submission IDs, CWD, transcript/skill paths, directories, descriptions,
 bodies, arbitrary metadata, reason codes and diagnostic messages/stacks never
 flow through this projection (except explicit raw prompt opt-in). Diagnostic IDs
 are filtered to the catalog, deduplicated and sorted; codes and optional models
@@ -375,9 +396,16 @@ UUID, timestamp and measured latency intentionally vary across events.
 
 `prompt.storage` is `hash` by default, `none` for no prompt fields, or explicit
 `raw` for a raw field only. HMAC-SHA256 inputs are `prompt\0` + exact prompt,
-`session\0` + agent + `\0` + session ID, and `turn\0` + agent + `\0` + turn ID.
-This separates domains and hosts while allowing same-installation correlation.
-There is no invented Claude turnKey. The key is independent of API credentials.
+`session\0` + agent + `\0` + session ID, and `host-prompt\0` + agent + `\0` +
+host submission ID. `host.promptKey` uses Codex `turn_id` or Claude `prompt_id`;
+legacy Claude input without prompt_id omits that key. No transcript lookup,
+random ID generation or session-based inference fills the gap.
+
+`prompt.hash` correlates content, while `host.promptKey` correlates submissions.
+Two submissions with identical text have identical prompt hashes but different
+promptKeys when their host IDs differ. Equal literal IDs from different hosts
+also produce different promptKeys. The session, content and host-prompt domains
+are distinct; the installation key is independent of API credentials.
 
 The key is exactly 32 cryptographically random bytes at `<dataDir>/install.key`.
 Data-dir priority: absolute `SKILLDISPATCH_DATA_DIR`, absolute `XDG_DATA_HOME`
