@@ -1,9 +1,9 @@
 # Architecture
 
-## Implemented PR1 / PR1.1 boundary
+## Implemented PR2 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
-library and CLI entry points. Only discovery and offline mock routing are active.
+library and CLI entry points. Discovery, Jev routing and offline mock routing are active.
 The sections describing hooks, telemetry and eval below are the roadmap.
 
 ```text
@@ -13,7 +13,8 @@ cli/program + commands
        -> scan + parse-skill + catalog
   -> core/route -> RouterProvider (providers/types)
        -> core/policy
-  -> providers/mock (chosen by the CLI composition root)
+  -> providers/jev | providers/mock (chosen by the CLI composition root)
+       -> jev/client -> @typesafe-ai/sdk (Jev only)
 ```
 
 `RouterProvider.judge` is the provider contract. Every eligible candidate must be
@@ -21,7 +22,8 @@ accounted for as one independent probability or an explicitly failed evaluation.
 The coordinator removes disabled skills before crossing that boundary and
 validates coverage/completeness before applying policy to successful decisions.
 Malformed results fail open; valid partial results preserve successes. An overall
-timeout uses an abort signal; future providers must cancel their own work.
+timeout uses an abort signal; Jev cancels in-flight requests through its safe
+transport and stops scheduling additional chunks.
 
 Discovery normalizes canonical paths, hashes agent/path identity independently
 of content, and retains same-name skills. Duplicate-name diagnostics group by
@@ -37,8 +39,8 @@ explicit-only host skills; it does not claim that a human cannot invoke them.
 The CLI returns structured JSON with no raw prompt and no persistent writes.
 The future trace schema is retained as a design artifact only.
 
-Configuration is restricted to implemented PR1 options. Unsupported providers
-error; unknown fields warn. No hook, Jev, telemetry, or eval stub is shipped.
+Configuration accepts `jev` (default) or explicit `mock`. Unsupported providers
+error; unknown fields warn. No hook, telemetry, or eval stub is shipped.
 
 See [README](../README.md) for supported paths, current host differences,
 configuration precedence and known discovery boundaries.
@@ -124,9 +126,9 @@ skill IDs are sorted; selection still uses probability/name/ID ordering. Input
 objects are not mutated, and measured latency remains nondeterministic.
 
 A provider exception or overall route timeout still fails open with
-`provider_failed` or `provider_timeout`. To preserve successes, a future provider
+`provider_failed` or `provider_timeout`. To preserve successes, a provider
 must account for failures and return valid partial output before the overall
-deadline. This contract introduces no chunking, concurrency, network or telemetry.
+deadline. SDK/transport details remain outside this contract.
 
 ### RoutingPolicy
 
@@ -137,7 +139,71 @@ applyPolicy(decisions, config) -> selected
 
 Keep network concerns out of policy.
 
-### TraceSink
+## Jev implementation (PR2)
+
+`JevRouterProvider` implements the unchanged `RouterProvider.judge` contract.
+Only the provider boundary imports `@typesafe-ai/sdk` (pinned to 0.6.0).
+`JevCall` is a narrow injectable function returning `unknown`; response validation
+is required even though the SDK has TypeScript types. Tests never need the real API.
+
+The request is `systemOne({ model, state, questions })`:
+
+- Shared state contains only `prompt` and `requestingAgent`.
+- Candidates sort by ID before chunking. Each chunk assigns local keys `q000`,
+  `q001`, … to independent Noul questions and keeps key-to-skill-ID mappings locally.
+- A structured question contains material-relevance instructions and only the
+  skill's name, description, host agent and scope. It describes yes/no criteria
+  and discourages incidental keyword matches. It does not send IDs, canonical
+  paths, CWD, arbitrary metadata, or complete SKILL.md bodies.
+- Every answer must have `type: noul` and a finite `noul` in [0, 1]. Missing/extra
+  keys, wrong types and invalid scores invalidate that chunk. Answer object order
+  is immaterial. `noul` becomes `probability` without rounding or calibration.
+
+A bounded worker pool processes at most `concurrency` chunks (default 2). Results
+are stored by chunk index, so completion order does not change decision or
+diagnostic ordering. The default and local maximum `chunkSize` is 48. Official
+OpenAPI publishes no question-count maximum; official model limits are token-based.
+48 is a conservative application bound, not a promise to fit every prompt/catalog
+into the model context. See [PR2 validation](PR2_VALIDATION.md) for sources.
+
+Chunk errors yield fixed safe codes and failed skill IDs; other successful chunks
+remain usable. All success is `complete`, any failures are `partial`, including
+all-failed results. Invalid **API chunk** responses become failed chunks in a valid
+partial domain result. An invalid **provider contract** still makes core routing
+fail open with empty decisions. API/network failures allow other chunks to proceed;
+a request timeout or cancellation stops queued work, while already-running workers
+settle. Unscheduled candidates also get explicit failed IDs. Overall `route()`
+timeout aborts the provider and returns an empty recommendation set as before.
+
+Retries default to 0 rather than the SDK's 2. `requestTimeoutMs` defaults to 1800
+per attempt; the route deadline defaults to 2500. Configurable retries are limited
+to 0–2 and stay subject to the overall deadline. No fallback to mock occurs.
+The returned actual model is reported only if successful chunks agree; an alias
+change across requests produces a safe `jev_model_mismatch` diagnostic instead
+of falsely attributing all decisions to one model.
+
+The SDK 0.6.0 native response-clone cancellation issue affects Node 20/22. Our
+custom fetch fully reads the single native response body before returning a new,
+in-memory Response to the SDK. Only this buffered transport receives the caller
+signal through the SDK, including SDK timeout cancellation. There is no native
+stream tee during abort and no process-wide rejection handler. Healthy, cancelled,
+body/header timeout and outer-route timeout paths run against loopback HTTP in
+strict child processes on Node 20 and 24. Revalidate this boundary on SDK upgrades.
+
+Credentials come from the CLI's `TYPESAFE_API_KEY` environment entry. Missing,
+blank or malformed credentials fail before network use. The key is sent only in
+SDK authentication, not in model input. SDK log level is explicitly `off`; its
+endpoint is fixed to `https://api.typesafe.ai` and redirects are rejected. Raw SDK
+exceptions, causes/stacks and HTTP error bodies never become domain diagnostics.
+The prompt and allowed descriptions **are sent to TypeSafe**; data embedded in
+those fields is not automatically redacted. Discovery remains entirely local.
+
+Independent Noul is a multi-label baseline, not competitive selection. Similar or
+broad skills may all score highly. Neither global threshold calibration nor
+catalog-specific accuracy is established. The future eval layer must measure
+this before any stronger accuracy claim or alternative strategy is adopted.
+
+## TraceSink (roadmap)
 
 ```ts
 interface TraceSink {
@@ -147,7 +213,7 @@ interface TraceSink {
 
 Trace failures are swallowed after optional debug logging.
 
-## Route execution
+## Planned full-runtime execution
 
 ```text
 discover skills
@@ -172,7 +238,8 @@ hook adapter response
 - discovery partial failure: continue with successfully discovered skills + diagnostics;
 - zero skills: return empty route immediately;
 - valid partial provider response: retain successful decisions and diagnose failed IDs;
-- Jev timeout/network failure: fail open;
+- Jev chunk timeout/network failure: retain successful chunks as partial;
+- overall route timeout: fail open with no recommendations;
 - malformed provider response: fail open + diagnostic;
 - telemetry failure: ignore for prompt path;
 - hook response serialization failure: emit minimal host-compatible success if possible.
@@ -194,4 +261,5 @@ Future persistent cache key:
 - Protect symlink traversal loops.
 - No shell interpolation of prompt text.
 - Hook adapter input is untrusted JSON.
-- Keep API keys only in process environment/config mechanism; never trace them.
+- Keep API keys only in the process environment (or an explicit library constructor
+  argument); never in YAML, model input or diagnostics.

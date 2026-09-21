@@ -236,6 +236,8 @@ tests/
   fixtures/     Valid/invalid skills, scope layouts and score fixtures
   discovery/    Parser, scopes, duplicates, symlinks, disabled skills
   routing/      Policy, provider isolation, validation, timeout and failure
+  providers/    Jev mapping, chunking, concurrency, privacy and partial failures
+  runtime/      Real SDK + loopback HTTP in strict child processes
   config/       Config precedence and diagnostics
   cli/          Command output, filtering, multi-skill routing and errors
 ```
@@ -265,7 +267,18 @@ pnpm test
 pnpm typecheck
 pnpm lint
 pnpm build
+pnpm pack
 ```
+
+For an opt-in live service smoke test from the source checkout:
+
+```sh
+pnpm test:jev-live
+```
+
+It skips without a key. With `TYPESAFE_API_KEY`, it sends only a small synthetic
+prompt/catalog, prints no prompt/key, and checks integration rather than accuracy.
+It is never run by `pnpm test` or CI automatically.
 
 Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
