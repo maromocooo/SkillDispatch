@@ -113,3 +113,53 @@ it("documents the hook and both hosts in CLI help", async () => {
   expect(output).toContain("codex");
   expect(output).toContain("claude");
 });
+
+it.each(["codex", "claude"] as const)(
+  "sanitizes real Jev boundary failures in the %s hook",
+  async (host) => {
+    const ctx = await workspace();
+    const data = join(ctx.root, "private-data");
+    const wire = JSON.parse(
+      await readFile(
+        new URL(`../fixtures/hooks/${host}.json`, import.meta.url),
+        "utf8",
+      ),
+    );
+    wire.cwd = ctx.cwd;
+    vi.mocked(fetch).mockRejectedValue(
+      new Error(`${wire.prompt} synthetic-api-key PRIVATE_SDK_STACK`),
+    );
+    let output = "";
+    await createProgram(
+      {
+        ...ctx,
+        env: {
+          SKILLDISPATCH_DATA_DIR: data,
+          TYPESAFE_API_KEY: "synthetic-api-key",
+        },
+      },
+      {
+        stdout: (s) => {
+          output += s;
+        },
+        stderr: (s) => {
+          output += s;
+        },
+      },
+      Readable.from([JSON.stringify(wire)]),
+    ).parseAsync(["hook", host], { from: "user" });
+    const text = await readFile(join(data, "traces.jsonl"), "utf8");
+    expect(fetch).toHaveBeenCalled();
+    expect(output).toBe("");
+    expect(text).not.toMatch(
+      /PRIVATE_HOOK_PROMPT_SENTINEL|synthetic-api-key|PRIVATE_SDK_STACK/,
+    );
+    expect(JSON.parse(text)).toMatchObject({
+      outcome: "partial",
+      decisions: [],
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: "provider_partial" }),
+      ]),
+    });
+  },
+);
