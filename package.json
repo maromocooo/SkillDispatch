@@ -29,7 +29,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "skilldispatch": "node dist/cli/index.js",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "commander": "^13.1.0",
@@ -43,5 +45,8 @@
     "tsup": "^8.5.0",
     "typescript": "~5.9.3",
     "vitest": "^3.2.6"
+  },
+  "bin": {
+    "skilldispatch": "dist/cli/index.js"
   }
 }

@@ -1,29 +1,21 @@
-# SkillDispatch example configuration
-
-mode: shadow
-
+# Copy to .skilldispatch.yaml or ~/.config/skilldispatch/config.yaml.
+# PR1 is offline: only the mock provider is implemented.
 router:
-  provider: jev
-  model: jev-latest
-  chunkSize: 48
-  concurrency: 2
+  provider: mock
   timeoutMs: 2500
-
+  # Optional deterministic fixture scores, keyed by skill ID or name.
+  # Omit mock to use the simple token-overlap fallback.
+  mock:
+    defaultProbability: 0.04
+    scores:
+      react-patterns: 0.95
+      frontend-testing: 0.91
+      accessibility-review: 0.88
+      deployment: 0.04
 policy:
   threshold: 0.75
   maxSkills: 4
-  ambiguityBand:
-    min: 0.55
-    max: 0.75
-
 discovery:
   agents:
     - codex
     - claude-code
-  includeDisabled: false
-
-telemetry:
-  prompt: hash
-  tracePath: ~/.local/share/skilldispatch/traces.jsonl
-
-debug: false

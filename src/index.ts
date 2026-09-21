@@ -1,4 +1,3 @@
-export const VERSION = "0.1.0-dev.1";
 export { applyPolicy, DEFAULT_POLICY } from "./core/policy.js";
 export { route } from "./core/route.js";
 export type * from "./core/types.js";
@@ -10,3 +9,4 @@ export type * from "./discovery/types.js";
 export type { MockProviderOptions } from "./providers/mock.js";
 export { MockRouterProvider } from "./providers/mock.js";
 export type * from "./providers/types.js";
+export { VERSION } from "./version.js";
