@@ -1,15 +1,18 @@
-# Implementation references verified on 2026-09-21
+# PR1 implementation references
 
-These are integration facts that were checked while preparing the handoff.
-Re-check official docs while implementing because these interfaces can change.
+Checked on 2026-09-21. Official documentation takes precedence over the handoff.
 
-- OpenAI Developers — Codex Hooks: `UserPromptSubmit`, its input/output fields, and `additionalContext`.
-- OpenAI Developers — Build Skills: current Codex local skill discovery paths and implicit invocation behavior.
-- Anthropic Claude Code Docs — `.claude` directory / skills and hook lifecycle.
-- TypeSafe official JS/TS SDK repository — `@typesafe-ai/sdk`, Node.js 20+.
+- [OpenAI: Build skills](https://learn.chatgpt.com/docs/build-skills) — local Codex
+  discovery paths, duplicate names, symlinks, per-path disable configuration and
+  implicit invocation policy. The previous developers.openai.com/codex/skills
+  link redirects here.
+- [Claude Code: Skills](https://code.claude.com/docs/en/skills) — project/personal
+  paths, ancestor discovery, fallback metadata, invocation controls and native
+  command precedence.
+- [Claude Code: Configuration directory](https://code.claude.com/docs/en/claude-directory)
+  — `CLAUDE_CONFIG_DIR` overrides the personal directory.
 
-Key facts captured in `IMPLEMENTATION_BRIEF.md`:
-- Codex currently accepts `UserPromptSubmit` additional developer context.
-- Codex scans `.agents/skills` in repository scopes and `$HOME/.agents/skills` for user skills.
-- Claude Code supports project/global skill directories and a pre-processing `UserPromptSubmit`.
-- TypeSafe provides an official TypeScript SDK suitable for the first Jev provider.
+Implementation choices and scope limits are recorded in [README](README.md).
+PR1 makes no network calls. Jev SDK, hook protocols and trace/eval integration
+must be reverified in their respective future implementation PRs; the handoff's
+notes about those APIs were not implementation validation for this PR.

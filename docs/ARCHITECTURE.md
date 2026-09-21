@@ -1,5 +1,45 @@
 # Architecture
 
+## Implemented PR1 boundary
+
+The shipped implementation is a single `skilldispatch` package with separate ESM
+library and CLI entry points. Only discovery and offline mock routing are active.
+The sections describing hooks, telemetry and eval below are the roadmap.
+
+```text
+cli/program + commands
+  -> config/load + schema
+  -> discovery/codex | discovery/claude
+       -> scan + parse-skill + catalog
+  -> core/route -> RouterProvider (providers/types)
+       -> core/policy
+  -> providers/mock (chosen by the CLI composition root)
+```
+
+`RouterProvider.judge` is the provider contract. Each eligible candidate receives
+one independent probability; a single-choice interface is intentionally absent.
+The coordinator removes disabled skills before crossing that boundary and
+validates the full response before applying the pure policy. Scores outside
+0..1, missing IDs, unknown IDs and duplicate IDs fail open. Timeout uses an abort
+signal and returns a diagnostic; future providers must cancel their own work.
+
+Discovery normalizes canonical paths, hashes agent/path identity independently
+of content, and retains name collisions. Host-specific fallback fields and
+invocation restrictions stay in adapters. Generic parsing and traversal do not
+execute skill content. Scan order is recorded as source metadata; it is not a
+promise that every host will resolve collisions identically.
+
+`enabled` means eligible for automatic routing. It also becomes false for
+explicit-only host skills; it does not claim that a human cannot invoke them.
+The CLI returns structured JSON with no raw prompt and no persistent writes.
+The future trace schema is retained as a design artifact only.
+
+Configuration is restricted to implemented PR1 options. Unsupported providers
+error; unknown fields warn. No hook, Jev, telemetry, or eval stub is shipped.
+
+See [README](../README.md) for supported paths, current host differences,
+configuration precedence and known discovery boundaries.
+
 ## Dependency direction
 
 ```text
