@@ -301,6 +301,39 @@ describe("eval CLI", () => {
     expect((await run(["eval", "eval.yaml"], ctx)).exitCode).toBe(1);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it("uses --cwd, --config, --agent and --threshold while resolving the eval file from the invocation directory", async () => {
+    const ctx = await fixture(["react-patterns"]);
+    await write(
+      join(ctx.repo, "custom.yaml"),
+      "router:\n  provider: mock\n  mock:\n    defaultProbability: 0\n    scores:\n      react-patterns: 0.9\n",
+    );
+    const output = await run(
+      [
+        "eval",
+        "eval.yaml",
+        "--cwd",
+        "../..",
+        "--config",
+        "custom.yaml",
+        "--agent",
+        "codex",
+        "--threshold",
+        "0.9",
+        "--json",
+      ],
+      ctx,
+    );
+    expect(output.exitCode).toBe(0);
+    const result = JSON.parse(output.stdout);
+    expect(result.policy.threshold).toBe(0.9);
+    expect(result.cases[0].selected).toHaveLength(1);
+    expect(result.cases[0].selected[0]).toMatchObject({
+      name: "react-patterns",
+      agent: "codex",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("CLI gates override file gates without changing other fields", async () => {
     const ctx = await fixture(["react-patterns"], ["frontend-testing"], false);
     await write(

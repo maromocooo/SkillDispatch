@@ -191,6 +191,37 @@ describe("eval runner through real route and policy", () => {
     expect(second).toEqual(first);
     expect(first.cases.map((item) => item.id)).toEqual(["case", "second"]);
   });
+
+  it("keeps one catalog snapshot even if the caller mutates its input during routing", async () => {
+    const catalog = [skill("a")];
+    const input = dataset(["a"]);
+    const firstCase = input.cases[0];
+    if (!firstCase) throw new Error("Missing fixture");
+    input.cases.push({ ...firstCase, id: "second" });
+    const judge = vi.fn<RouterProvider["judge"]>(async (request) => {
+      catalog[0] = skill("changed", { enabled: false });
+      return {
+        completeness: "complete",
+        decisions: request.candidates.map((candidate) => ({
+          skillId: candidate.id,
+          probability: 1,
+        })),
+      };
+    });
+    const result = await runEvaluation(input, {
+      ...options({ name: "snapshot", judge }),
+      skills: catalog,
+    });
+    expect(result.metrics).toMatchObject({
+      truePositives: 2,
+      falseNegatives: 0,
+      exactSetAccuracy: 1,
+    });
+    expect(judge).toHaveBeenCalledTimes(2);
+    expect(result.cases.every((item) => item.selected[0]?.name === "a")).toBe(
+      true,
+    );
+  });
   it("applies file gates and field-by-field overrides with validation", async () => {
     const input = {
       ...dataset(["a", "b"]),

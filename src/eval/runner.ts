@@ -41,7 +41,9 @@ export async function runEvaluation(
   options: EvaluationOptions,
 ): Promise<EvalResult> {
   const validated = validateEvalDataset(dataset);
-  const resolved = resolveEvalCases(validated, options.skills);
+  // Freeze the evaluated catalog's routing fields against caller mutation between cases.
+  const skills = options.skills.map((skill) => ({ ...skill }));
+  const resolved = resolveEvalCases(validated, skills);
   const parsedGates = evalGatesSchema.safeParse({
     ...validated.gates,
     ...options.gates,
@@ -56,13 +58,13 @@ export async function runEvaluation(
         prompt: item.prompt,
         cwd: options.cwd,
         agent: options.agent,
-        skills: options.skills,
+        skills,
       },
       options.provider,
       policy,
       options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs },
     );
-    cases.push(scoreCase(item, result, options.skills));
+    cases.push(scoreCase(item, result, skills));
   }
   const metrics = aggregateMetrics(cases);
   const gates = evaluateGates(metrics, parsedGates.data);
