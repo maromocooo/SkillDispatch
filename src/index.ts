@@ -23,6 +23,7 @@ export type { MockProviderOptions } from "./providers/mock.js";
 export { MockRouterProvider } from "./providers/mock.js";
 export type * from "./providers/types.js";
 export { catalogFingerprint } from "./telemetry/fingerprint.js";
+export { JsonlTraceSink } from "./telemetry/jsonl.js";
 export type { RouteTrace, TraceSink } from "./telemetry/types.js";
 export { routeTraceSchema } from "./telemetry/types.js";
 export { VERSION } from "./version.js";

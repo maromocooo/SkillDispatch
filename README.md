@@ -363,6 +363,12 @@ in `schemas/route-trace.schema.json`. `selected` means selected by SkillDispatch
 policy, not observed host invocation. Trace construction projects only safe fields;
 prompt hashing uses an installation key and HMAC-SHA256. Catalog fingerprints omit
 paths and path-derived IDs while retaining semantic fields and duplicate counts.
+`JsonlTraceSink` is best effort and appends each validated event in one operation.
+Its destination directory and files must be private; new directories/files use
+0700/0600 on POSIX. Symlink files and unsafe existing permissions are rejected.
+The installation key is 32 random bytes, atomically published without replacing a
+concurrent winner. Data directory precedence is `SKILLDISPATCH_DATA_DIR`, absolute
+`XDG_DATA_HOME` + `/skilldispatch`, then `~/.local/share/skilldispatch`.
 
 The library also exports `parseEvalYaml`, `loadEvalFile`, and `runEvaluation`.
 Evaluation resolves every expected skill against a catalog before routing any
