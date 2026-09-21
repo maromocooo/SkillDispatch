@@ -25,6 +25,63 @@ const request: JevRequest = {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Jev SDK boundary", () => {
+  it("honors an explicitly small retry count without forwarding HTTP error bodies", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ detail: "synthetic-test-only private-prompt" }),
+          { status: 503, headers: { "retry-after-ms": "0" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            model: "jev-fixture",
+            answers: { q000: { type: "noul", noul: 1 } },
+          }),
+        ),
+      );
+    const call = createJevCall(
+      {
+        ...resolveJevOptions({ maxRetries: 1 }),
+        apiKey: "synthetic-test-only",
+      },
+      fetcher,
+    );
+    expect(await call(request)).toMatchObject({
+      answers: { q000: { noul: 1 } },
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry HTTP failures by default or propagate raw response error text", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          detail: "synthetic-test-only private-prompt secret-looking-value",
+        }),
+        { status: 503 },
+      ),
+    );
+    const call = createJevCall(
+      { ...resolveJevOptions({}), apiKey: "synthetic-test-only" },
+      fetcher,
+    );
+    await call(request).then(
+      () => {
+        throw new Error("Expected failure");
+      },
+      (error: Error) => {
+        expect(error.message).toBe("Jev evaluation unavailable.");
+        expect(error.cause).toBeUndefined();
+        expect(JSON.stringify(error)).not.toMatch(
+          /synthetic-test-only|private-prompt|secret-looking-value/,
+        );
+      },
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it.each([
     undefined,
     "",

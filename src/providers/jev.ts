@@ -21,7 +21,7 @@ import type {
   RoutingCandidate,
 } from "./types.js";
 
-export type JevProviderOptions = JevOptions & { apiKey?: string };
+export type JevProviderOptions = JevOptions & { apiKey?: string | undefined };
 export type { JevCall, JevRequest };
 
 const responseSchema = z.object({

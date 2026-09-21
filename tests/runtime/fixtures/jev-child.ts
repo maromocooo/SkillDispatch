@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { route } from "../../../src/core/route.js";
 import { createJevCall } from "../../../src/providers/jev/client.js";
 import { resolveJevOptions } from "../../../src/providers/jev/options.js";
 import { skillQuestion } from "../../../src/providers/jev/questions.js";
+import { JevRouterProvider } from "../../../src/providers/jev.js";
 
 const mode = process.argv[2];
 let requests = 0;
@@ -33,7 +35,9 @@ try {
     const call = createJevCall(
       {
         ...resolveJevOptions({
-          requestTimeoutMs: mode === "cancel" ? 2000 : 150,
+          requestTimeoutMs: ["timeout", "before-headers"].includes(mode ?? "")
+            ? 150
+            : 2000,
         }),
         apiKey: "synthetic-test-only",
       },
@@ -44,6 +48,34 @@ try {
         return response;
       },
     );
+    if (mode === "route-timeout") {
+      const result = await route(
+        {
+          prompt: "synthetic",
+          cwd: "/local",
+          agent: "generic",
+          skills: ["A", "B", "C"].map((id) => ({
+            id,
+            name: "review",
+            description: "Code review",
+            agent: "codex",
+            scope: "repo",
+            enabled: true,
+            path: "/local/SKILL.md",
+            directory: "/local",
+            contentHash: "hash",
+            metadata: {},
+          })),
+        },
+        new JevRouterProvider({ chunkSize: 1, concurrency: 1 }, { call }),
+        undefined,
+        { timeoutMs: 150 },
+      );
+      assert.deepEqual(result.selected, []);
+      assert.equal(result.diagnostics[0]?.code, "provider_timeout");
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+      continue;
+    }
     const result = call(
       {
         model: "jev-latest",

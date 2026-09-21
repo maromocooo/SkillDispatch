@@ -30,6 +30,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
+    "test:jev-live": "pnpm build && node scripts/jev-live.mjs",
     "skilldispatch": "node dist/cli/index.js",
     "prepack": "pnpm build"
   },

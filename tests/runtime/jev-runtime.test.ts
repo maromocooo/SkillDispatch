@@ -26,7 +26,7 @@ afterAll(async () => {
 });
 
 describe("real SDK with loopback HTTP in a strict child process", () => {
-  it.each(["healthy", "cancel", "timeout", "before-headers"])(
+  it.each(["healthy", "cancel", "timeout", "before-headers", "route-timeout"])(
     "exits 0 after %s on the current Node runtime",
     async (mode) => {
       const result = await run(
