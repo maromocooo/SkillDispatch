@@ -8,6 +8,12 @@ export { CodexDiscoveryAdapter } from "./discovery/codex.js";
 export type { ParseSkillContext } from "./discovery/parse-skill.js";
 export { parseSkill } from "./discovery/parse-skill.js";
 export type * from "./discovery/types.js";
+export type {
+  JevCall,
+  JevProviderOptions,
+  JevRequest,
+} from "./providers/jev.js";
+export { JevRouterProvider } from "./providers/jev.js";
 export type { MockProviderOptions } from "./providers/mock.js";
 export { MockRouterProvider } from "./providers/mock.js";
 export type * from "./providers/types.js";
