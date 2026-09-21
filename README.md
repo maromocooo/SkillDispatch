@@ -21,3 +21,8 @@ pnpm build
 
 The library and CLI will keep discovery adapters, providers, and core policy
 separate. No runtime network calls are made in PR1.
+
+The library exports `SkillDescriptor`, `DiscoveryAdapter`, and a data-only
+`parseSkill` parser. Invalid frontmatter returns diagnostics; it never executes
+Markdown. Skill IDs use the agent and canonical path; content hashes use the
+original source, independent of metadata whitespace normalization.
