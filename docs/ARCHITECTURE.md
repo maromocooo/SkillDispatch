@@ -1,14 +1,14 @@
 # Architecture
 
-## Implemented PR3 boundary
+## Implemented PR4 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
-library and CLI entry points. Discovery, Jev/mock routing and routing evaluation are active.
-The sections describing hooks and telemetry below are the roadmap.
+library and CLI entry points. Discovery, Jev/mock routing, routing evaluation,
+shadow hooks and local traces are active. Advisory/enforce behavior is deferred.
 
 ```text
 cli/program + commands
-  -> config/load + schema
+  -> runtime/context -> config/load + schema
   -> discovery/codex | discovery/claude
        -> scan + parse-skill + catalog
   -> core/route -> RouterProvider (providers/types)
@@ -17,6 +17,8 @@ cli/program + commands
        -> jev/client -> @typesafe-ai/sdk (Jev only)
   -> eval/schema -> eval/resolve -> eval/runner -> core/route
        -> eval/metrics (pure scoring and aggregation)
+  -> hooks/codex | hooks/claude -> hooks/runtime -> runtime/context + core/route
+       -> telemetry/trace -> privacy + fingerprint -> JsonlTraceSink
 ```
 
 `RouterProvider.judge` is the provider contract. Every eligible candidate must be
@@ -38,12 +40,13 @@ promise that every host will resolve collisions identically.
 
 `enabled` means eligible for automatic routing. It also becomes false for
 explicit-only host skills; it does not claim that a human cannot invoke them.
-The CLI returns structured JSON with no raw prompt and no persistent writes.
-The future trace schema is retained as a design artifact only.
+Discover, route and eval keep their existing nonpersisting behavior. Only hooks
+write the new public Route Trace v1 contract; prompt storage defaults to HMAC.
 
 Configuration accepts `jev` (default) or explicit `mock`. Unsupported providers
 error; unknown config fields warn. Eval input uses its own strict versioned schema.
-No hook or telemetry stub is shipped.
+Telemetry configuration is hook-only; no mode option or context-injection path
+is accepted. Shared composition selects the same provider/policy for all commands.
 
 See [README](../README.md) for supported paths, current host differences,
 configuration precedence and known discovery boundaries.
@@ -273,7 +276,7 @@ Given the same catalog, dataset, scores and policy, ordering and count metrics
 are deterministic. Core ranking is retained for selections; label and diagnostic
 ordering uses the existing locale-independent comparison. Live API responses and
 measured latency can vary. Pin catalog descriptions/config/dataset and a stable
-model where available for comparisons; no run registry or persistent traces exist.
+model where available for comparisons; eval itself has no run registry or persistence.
 
 CLI gates override file gates per field and compare inclusively. An undefined
 metric cannot pass a requested gate, even at zero. Completed results exit 0 unless
@@ -287,7 +290,49 @@ explicit/implicit/multiple/no-skill, overlapping or broad/specific, negated and
 multilingual cases before accuracy claims. Fixture scores test the measurement
 pipeline, not Jev semantics. No threshold tuning or alternate router is added.
 
-## TraceSink (roadmap)
+## Shadow hooks (PR4)
+
+`hooks/codex.ts` and `hooks/claude.ts` translate current UserPromptSubmit wire
+objects into `{agent, cwd, prompt, sessionId, turnId?, model?}`. Zod object parsers
+check required fields and known optional types, then strip unknown extensions.
+Codex requires session/turn/model, accepts a null transcript path, and discards
+agent_id/agent_type. Claude requires session/transcript/CWD/permission/event/prompt,
+validates current optional prompt_id/scratchpad/agent/effort fields, and discards
+them. Its prompt_id is not a turn identifier; no model or turn is invented.
+Neither adapter reads a transcript or passes its path to the runtime.
+
+`hooks/stdin.ts` reads at most 1 MiB and waits at most one second for EOF. Invalid
+JSON/event/types, oversized input, stream errors and empty prompt text are silent
+no-ops before any provider request. `hooks/runtime.ts` loads config/discovery
+through `runtime/context.ts` using the **hook CWD**, forcing the host's single-agent
+catalog regardless of `discovery.agents`. Normal CLI can still use both agents.
+Disabled skills remain in counts/fingerprints but never become provider candidates.
+
+The runtime creates private storage/key prerequisites, selects the existing
+provider, calls core `route()`, explicitly projects a trace and awaits the sink.
+There is no parallel implementation of routing policy or SDK behavior. Every
+exception is contained; provider setup errors become fixed `provider_setup_failed`
+diagnostics when input/config/catalog/key setup is available. Core failures
+retain their existing safe codes. Unexpected route exceptions become
+`hook_runtime_failed`. Config/discovery/key initialization errors may produce no
+trace at all. An invalid or unwritable sink never fails the host operation.
+
+Only `skilldispatch hook codex|claude` gets a 4-second process deadline, covering
+stdin, discovery, routing and storage. On return it exits 0 even if timed-out SDK
+work still has sockets alive. The library has no process lifecycle side effects.
+The underlying route default remains 2500 ms. Recommend host command timeout 5
+seconds for startup/headroom; command hooks block while running, so shadow mode
+has a latency cost despite leaving context and decisions untouched.
+
+The result is always empty stdout, silent stderr and exit 0; no response JSON,
+additionalContext, decision, reason or systemMessage is generated. Empty success
+is neutral for both current hosts. Help/invalid CLI usage retain ordinary CLI
+semantics; fail-open applies to supported hook invocations. This is deliberately
+**shadow only**. Advisory injection will be evaluated separately per host after
+shadow data is available, including Codex's reported context-placement concern.
+See [PR4 validation](PR4_VALIDATION.md) for official input/output/config sources.
+
+## Route Trace v1 and TraceSink
 
 ```ts
 interface TraceSink {
@@ -295,27 +340,80 @@ interface TraceSink {
 }
 ```
 
-Trace failures are swallowed after optional debug logging.
+`telemetry/types.ts` is the strict Zod definition of schemaVersion `1.0`;
+`schemas/route-trace.schema.json` is its shipped draft-2020-12 JSON Schema.
+Objects reject extra properties. Tests compare generated schema and validate
+emitted JSONL with a dev-only Ajv validator. This replaces the never-emitted
+handoff draft. Readers should dispatch by schemaVersion; incompatible changes
+after this release require an explicit new contract version.
 
-## Planned full-runtime execution
+The allowlist projection includes trace UUID/time, agent/shadow mode, prompt
+storage discriminator, pseudonymous host keys/model, catalog fingerprint/counts,
+provider/model/route latency, threshold/maxSkills, outcome, scored decisions and
+diagnostic code/level/known skill IDs. Decisions contain local skill ID, name,
+agent, scope, contentHash, probability and policy-selected flag, in core ranking
+order. No decision is fabricated for disabled or failed candidates. Selection
+means a SkillDispatch recommendation only, not native invocation or adherence.
 
-```text
-discover skills
-    ↓
-filter enabled/valid
-    ↓
-build RouteRequest
-    ↓
-provider.judge()
-    ↓
-validate completeness, ID coverage and probabilities
-    ↓
-applyPolicy(successful decisions)
-    ↓
-emit trace
-    ↓
-hook adapter response
-```
+Outcome precedence is failed before partial before complete. Core provider
+exception/timeout/malformed-response, setup failure and unexpected route failure
+are failed. `provider_partial` means partial, including all-failed partials; its
+skillIds identify missing evaluations. Otherwise routing is complete, including
+an empty eligible catalog requiring no judgments. Provider setup failures have
+latency 0; otherwise latency is route execution only, not whole-hook wall time.
+
+Raw prompt/session/turn IDs, CWD, transcript/skill paths, directories, descriptions,
+bodies, arbitrary metadata, reason codes and diagnostic messages/stacks never
+flow through this projection (except explicit raw prompt opt-in). Diagnostic IDs
+are filtered to the catalog, deduplicated and sorted; codes and optional models
+use bounded safe token formats. Those formats do not identify arbitrary secrets;
+allowed metadata still depends on its source contract. Never use raw SDK text as
+a diagnostic field. Trace metadata ordering uses the locale-independent helper;
+UUID, timestamp and measured latency intentionally vary across events.
+
+### Private correlation and fingerprinting
+
+`prompt.storage` is `hash` by default, `none` for no prompt fields, or explicit
+`raw` for a raw field only. HMAC-SHA256 inputs are `prompt\0` + exact prompt,
+`session\0` + agent + `\0` + session ID, and `turn\0` + agent + `\0` + turn ID.
+This separates domains and hosts while allowing same-installation correlation.
+There is no invented Claude turnKey. The key is independent of API credentials.
+
+The key is exactly 32 cryptographically random bytes at `<dataDir>/install.key`.
+Data-dir priority: absolute `SKILLDISPATCH_DATA_DIR`, absolute `XDG_DATA_HOME`
+plus `/skilldispatch`, then `~/.local/share/skilldispatch`. A private temporary
+file is written/closed, then atomically published by an exclusive hard link.
+Racing creators read the winning complete key; corrupt keys are not replaced.
+No automatic key rotation is performed. POSIX leaf directories/files must belong
+to the current user and have no group/other permissions (new modes 0700/0600).
+Leaf-directory/file symlinks are rejected; file opens use no-follow/nonblocking
+flags where supported. Windows permission/ACL behavior is not certified here.
+
+Catalog fingerprint is SHA-256 of UTF-8 JSON of the sorted array of serialized
+`[agent, scope, whitespaceNormalizedName, contentHash, enabled]` tuples. Sorting
+uses `compareText`, retains multiplicity, and is independent of input order,
+locale, absolute paths and path-derived IDs. Names remain case-sensitive. Content
+or enabled changes affect the fingerprint; moving otherwise identical skills does
+not. This enables semantic catalog comparison across installations, while each
+trace decision's existing skill ID remains a local identity.
+
+### JSONL persistence
+
+Default `<dataDir>/traces.jsonl`, optionally overridden by absolute or `~/`
+`telemetry.tracePath`; this cannot target the installation key. Each validated
+event is serialized once with one trailing newline and written with **one
+O_APPEND operation**. No short-write retry splits an event across writes. Trace
+files must be private regular files with one link. Multiple local processes are
+tested; this is best-effort storage, not transactional or fsync-durable. A crash,
+short write, disk failure or process deadline can drop an event or leave an
+incomplete final line. Consumers should tolerate a damaged trailing line.
+Network filesystem append/link guarantees are not assumed.
+
+No trace is written by discover/route/eval. `telemetry.enabled: false` skips hook
+routing/storage. There is no retention manager, upload or automatic settings
+mutation. Prompt hashing changes local storage only: Jev still receives the
+prompt and routing descriptions under the existing request privacy contract.
+Text absent from the host hook is not reconstructed from transcripts or images.
 
 ## Failure behavior
 
@@ -326,7 +424,7 @@ hook adapter response
 - overall route timeout: fail open with no recommendations;
 - malformed provider response: fail open + diagnostic;
 - telemetry failure: ignore for prompt path;
-- hook response serialization failure: emit minimal host-compatible success if possible.
+- hook/config/key/trace failure: return silent, empty success; no host output is serialized.
 
 ## Caching
 

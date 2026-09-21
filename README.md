@@ -6,10 +6,9 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR3 development preview, including routing evaluation. Real Jev routing
-quality has not been established. Hooks, telemetry, `doctor`, and Agent Skill Studio
-are not implemented. The handoff and trace
-schema describe the future runtime, not the current CLI surface.
+**Status:** PR4 development preview: discovery, routing, evaluation, and silent
+shadow hooks with private local JSONL traces. Real Jev routing quality has not been
+established. Advisory injection, `doctor`, and Agent Skill Studio are not implemented.
 
 ## Install from source
 
@@ -55,6 +54,10 @@ skilldispatch discover --cwd ./packages/web --json
 skilldispatch eval evals/example.yaml
 skilldispatch eval evals/example.yaml --json
 skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
+
+# Host command hooks supply their UserPromptSubmit JSON on stdin.
+skilldispatch hook codex
+skilldispatch hook claude
 ```
 
 From a source checkout, replace `skilldispatch` with `pnpm skilldispatch` or
@@ -162,8 +165,8 @@ logging and environment endpoint overrides are disabled. Responses are buffered
 before SDK stream cloning to avoid the Node 20 cancellation issue; see
 [the validation notes](docs/PR2_VALIDATION.md) for tests and limitations.
 
-The future trace location is `~/.local/share/skilldispatch/traces.jsonl`. PR2 does
-not write traces and does not accept telemetry or mode configuration.
+Only hook commands persist traces. `discover`, `route`, and `eval` keep their
+existing behavior and never write telemetry, even when it is enabled.
 
 ## Discovery behavior and current host differences
 
@@ -299,6 +302,141 @@ example dataset illustrates explicit/implicit/multiple/no-skill, overlapping,
 negated, Japanese and mixed-language requests; tailor labels and broad/specific
 skill pairs to your catalog. No automatic threshold tuning or reranking is added.
 
+## Shadow hooks and local traces
+
+PR4 runs routing for observation only. It never returns `additionalContext`, a
+blocking decision, a reason, or a system message. Both hook commands finish with
+**exit 0 and empty stdout/stderr**, including errors. This preserves host context
+and decisions, but synchronous hooks still add bounded latency. `selected` means
+**recommended by SkillDispatch's policy**, not that the host invoked or followed
+a skill or that output quality improved.
+
+### Enable manually
+
+After installing the CLI, add the following to the appropriate host settings.
+Make the executable and `TYPESAFE_API_KEY` available to the host process; use an
+absolute executable path if its PATH differs from your shell. No installer or
+settings mutation is provided. Retain any existing hooks when editing these files.
+
+For [Codex hooks](https://learn.chatgpt.com/docs/hooks), use
+`~/.codex/hooks.json` or a trusted project's `.codex/hooks.json`. Review/trust
+the hook definition in Codex before it runs; avoid registering it in both places:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "skilldispatch hook codex",
+        "timeout": 5
+      }]
+    }]
+  }
+}
+```
+
+For [Claude Code hooks](https://code.claude.com/docs/en/hooks), add to
+`~/.claude/settings.json` or the project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "skilldispatch hook claude",
+        "timeout": 5
+      }]
+    }]
+  }
+}
+```
+
+Both examples use **seconds**. Five seconds gives headroom around the default
+2,500 ms route timeout. SkillDispatch limits stdin to 1 MiB / 1 second and the
+dedicated CLI hook process to 4 seconds, including setup/storage. The latter is
+an emergency cutoff; it may leave no trace. Claude's synchronous UserPromptSubmit
+hook blocks prompt processing while it runs, so keep this budget short.
+
+Each adapter uses the hook's CWD for project discovery/config, forces its own
+agent (`codex` or `claude-code`), and never routes the other host's skills.
+Required/known fields are type-checked; unknown future fields are ignored.
+Codex session/turn/model are supported. Claude supplies session correlation but
+no UserPromptSubmit model/turn ID; its optional `prompt_id` is not treated as a
+turn ID. Transcript paths are discarded without reading the file.
+
+### Storage and privacy
+
+Optional configuration in `.skilldispatch.yaml` or user config:
+
+```yaml
+telemetry:
+  enabled: true
+  prompt: hash
+  # Optional absolute or ~/ path; its parent must be private.
+  # tracePath: ~/.local/share/skilldispatch/traces.jsonl
+```
+
+The default directory is `~/.local/share/skilldispatch`. An absolute
+`SKILLDISPATCH_DATA_DIR` overrides it; otherwise an absolute `XDG_DATA_HOME`
+places it at `$XDG_DATA_HOME/skilldispatch`. The directory contains `install.key`
+and `traces.jsonl`. A custom `tracePath` changes only the trace destination;
+it cannot target the installation key. Set `telemetry.enabled: false` to skip
+hook routing and storage. `router.provider: mock` remains an explicit offline
+option for testing hook setup.
+
+- **`hash` (default):** HMAC-SHA256 of the exact prompt using a private, local
+  32-byte random installation key. Same installation/prompt correlates; separate
+  keys produce different hashes. The API key is never used as the hash key.
+- **`none`:** neither raw prompt nor prompt hash is stored. Session/turn
+  correlation is still keyed and available.
+- **`raw`: explicit opt-in only.** Stores the complete hook prompt locally,
+  potentially including source code, personal data or secrets. Review retention
+  and file access before enabling it. It is not needed for ordinary shadow use.
+
+Session/turn values also use HMAC, with separate domains and the host agent;
+raw host IDs are not stored. New directories/files use 0700/0600 on POSIX.
+Key creation is race-safe; an existing key is never replaced automatically.
+Unsafe permissions, symlink destinations, corrupt keys and I/O failures cause
+silent no-op behavior rather than exposing data or blocking the host. Back up
+or remove keys deliberately: changing the key breaks historical correlation.
+Protect the key separately from any trace you choose to share.
+
+[Route Trace v1](schemas/route-trace.schema.json) is a strict, versioned public
+contract. It stores a trace ID/time, host, policy, provider/model/latency,
+catalog fingerprint/counts, scored decisions, and diagnostic codes/levels/skill
+IDs. Decisions include skill name/agent/scope/content hash/probability/selection.
+The catalog fingerprint ignores paths and path-derived IDs, includes enabled
+state, and preserves duplicate counts. Skill IDs themselves remain local identities.
+
+It does **not** store CWD, skill paths/directories/descriptions/bodies, transcript
+paths, raw session/turn IDs, diagnostic messages/stacks, SDK errors, API keys or
+environment values. Allowed fields such as skill names are metadata, not an
+arbitrary-secret redaction mechanism. Prompt hashing protects local storage;
+**Jev still receives the prompt and permitted skill descriptions** as described
+above. There is no upload, cloud sync, automatic rotation or retention manager.
+
+`outcome` is `complete`, `partial`, or `failed`. Partial decisions survive, and
+`provider_partial.skillIds` identifies unevaluated candidates (including an
+all-failed partial). Provider exceptions, overall timeouts, invalid results and
+setup failures produce failed traces when safe setup is available. Config,
+discovery or key failures may prevent any trace. Writer failures are swallowed.
+Events use one append each; storage is best effort, not a durable audit log.
+
+### Host visibility and advisory deferral
+
+Only supplied prompt text is evaluated. Codex currently omits structured
+attachments from this event, as reported in [upstream #41128](https://github.com/openai/codex/issues/41128).
+SkillDispatch does not inspect transcripts, images, session files or missing
+Claude content to compensate. Empty/whitespace-only text is a safe no-op.
+
+PR4 intentionally implements shadow mode only: measure first, inject later.
+Codex's context placement/salience concern is tracked in
+[upstream #40680](https://github.com/openai/codex/issues/40680). Advisory behavior
+will be evaluated separately for each host after shadow observations are
+available. Claude does not receive advisory injection ahead of Codex.
+
 ## Library and architecture
 
 ```ts
@@ -326,13 +464,18 @@ src/
   providers/    RouterProvider contract, deterministic mock and Jev SDK boundary
   config/       YAML validation and layered loading
   eval/         YAML schema, selector resolution, metrics and sequential runner
-  cli/          Shared composition root and discover/route/eval commands
+  runtime/      Config/discovery/provider composition shared by CLI and hooks
+  hooks/        Bounded stdin, host wire adapters and silent shadow runtime
+  telemetry/    Trace v1 projection, HMAC, catalog fingerprint and JSONL sink
+  cli/          discover/route/eval/hook commands
 tests/
   fixtures/     Valid/invalid skills, scope layouts and score fixtures
   discovery/    Parser, scopes, duplicates, symlinks, disabled skills
   routing/      Policy, provider isolation, validation, timeout and failure
   providers/    Jev mapping, chunking, concurrency, privacy and partial failures
-  runtime/      Real SDK + loopback HTTP in strict child processes
+  runtime/      Strict child processes, SDK loopback and concurrent trace storage
+  hooks/        Host fixtures, single-agent routing and fail-open behavior
+  telemetry/    Privacy, schema parity, hashing, permissions and append behavior
   eval/         Input, labels, metrics, reliability, privacy and dataset fixtures
   config/       Config precedence and diagnostics
   cli/          Command output, filtering, multi-skill routing and errors
@@ -358,24 +501,10 @@ See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
 ## Development
 
-`skilldispatch hook codex` and `skilldispatch hook claude` now read bounded
-UserPromptSubmit JSON from stdin, discover only that host's catalog at the input
-CWD, and write a shadow trace. Both succeed silently, including on errors.
-`telemetry.enabled` defaults to true and `telemetry.prompt` to `hash`; only hooks
-persist traces. Set `telemetry.enabled: false` to skip shadow routing and storage.
-
-
-The public `routeTraceSchema` defines the new shadow-only Route Trace v1 contract
-in `schemas/route-trace.schema.json`. `selected` means selected by SkillDispatch's
-policy, not observed host invocation. Trace construction projects only safe fields;
-prompt hashing uses an installation key and HMAC-SHA256. Catalog fingerprints omit
-paths and path-derived IDs while retaining semantic fields and duplicate counts.
-`JsonlTraceSink` is best effort and appends each validated event in one operation.
-Its destination directory and files must be private; new directories/files use
-0700/0600 on POSIX. Symlink files and unsafe existing permissions are rejected.
-The installation key is 32 random bytes, atomically published without replacing a
-concurrent winner. Data directory precedence is `SKILLDISPATCH_DATA_DIR`, absolute
-`XDG_DATA_HOME` + `/skilldispatch`, then `~/.local/share/skilldispatch`.
+The public trace exports are `RouteTrace`, `TraceSink`, `routeTraceSchema`,
+`catalogFingerprint`, and `JsonlTraceSink`. Host parsers/runtime and key-management
+helpers remain internal. JSON Schema is generated from the strict Zod definition;
+Ajv tests validate emitted events and detect schema drift.
 
 The library also exports `parseEvalYaml`, `loadEvalFile`, and `runEvaluation`.
 Evaluation resolves every expected skill against a catalog before routing any
@@ -405,6 +534,7 @@ It is never run by `pnpm test` or CI automatically.
 Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
 HTTP in child processes. Format with `pnpm format`. See
-[PR3 validation](docs/PR3_VALIDATION.md) for eval, runtime and package checks, and
+[PR4 validation](docs/PR4_VALIDATION.md) for hooks, traces and package checks,
+[PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
-Hooks, telemetry/JSONL traces and Studio remain later work.
+Advisory/enforce modes, invocation detection, Studio and cloud trace services remain later work.

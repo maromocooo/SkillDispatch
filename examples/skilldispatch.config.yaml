@@ -14,3 +14,9 @@ policy:
   maxSkills: 4
 discovery:
   agents: [codex, claude-code]
+# Hook-only persistence; route/eval/discover never write traces.
+telemetry:
+  enabled: true
+  prompt: hash
+  # Defaults to the data directory; this optional override is absolute or ~/.
+  # tracePath: ~/.local/share/skilldispatch/traces.jsonl
