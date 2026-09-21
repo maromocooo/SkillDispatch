@@ -18,6 +18,7 @@ export const maxSkillsSchema = z
   .max(Number.MAX_SAFE_INTEGER);
 
 export const configFileSchema = z.object({
+  hook: z.object({ trustProjectConfig: z.boolean().optional() }).optional(),
   telemetry: z
     .object({
       enabled: z.boolean().optional(),
@@ -57,6 +58,7 @@ export const configFileSchema = z.object({
 });
 
 export interface SkillDispatchConfig {
+  hook: { trustProjectConfig: boolean };
   telemetry: {
     enabled: boolean;
     prompt: "none" | "hash" | "raw";
@@ -73,6 +75,7 @@ export interface SkillDispatchConfig {
 }
 
 export const defaultConfig = (): SkillDispatchConfig => ({
+  hook: { trustProjectConfig: false },
   telemetry: { enabled: true, prompt: "hash" },
   router: {
     provider: "jev",

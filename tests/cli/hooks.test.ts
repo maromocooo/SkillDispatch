@@ -51,7 +51,7 @@ it.each(["codex", "claude"] as const)(
     // Missing API key is a setup error for route/eval, but a failed trace for hooks.
     await expect(run(JSON.stringify(wire))).resolves.toBeDefined();
     await write(
-      join(ctx.cwd, ".skilldispatch.yaml"),
+      join(ctx.home, ".config/skilldispatch/config.yaml"),
       "router: {provider: mock}\n",
     );
     await expect(

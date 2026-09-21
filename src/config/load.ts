@@ -5,33 +5,55 @@ import type { Diagnostic } from "../core/types.js";
 import { isMissing } from "../discovery/filesystem.js";
 import { configFileSchema, defaultConfig } from "./schema.js";
 
+export type ConfigSource = "user" | "project" | "explicit";
+export type ConfigMode = "cli" | "hook";
+
+interface ConfigLayer {
+  source: ConfigSource;
+  path: string;
+}
+
 export async function loadConfig(options: {
   cwd: string;
   home: string;
   configPath?: string;
+  mode?: ConfigMode;
 }) {
   const config = defaultConfig();
   const diagnostics: Diagnostic[] = [];
-  const paths = [
-    join(options.home, ".config/skilldispatch/config.yaml"),
-    join(options.cwd, ".skilldispatch.yaml"),
+  const layers: ConfigLayer[] = [
+    {
+      source: "user",
+      path: join(options.home, ".config/skilldispatch/config.yaml"),
+    },
+    { source: "project", path: join(options.cwd, ".skilldispatch.yaml") },
   ];
-  if (options.configPath !== undefined)
-    paths.push(resolve(options.cwd, options.configPath));
-  for (const [index, path] of paths.entries()) {
-    let source: string;
+  // Hook configuration authority is user-only. No explicit layer may bypass it.
+  if (options.mode !== "hook" && options.configPath !== undefined)
+    layers.push({
+      source: "explicit",
+      path: resolve(options.cwd, options.configPath),
+    });
+  for (const { source, path } of layers) {
+    if (
+      source === "project" &&
+      options.mode === "hook" &&
+      !config.hook.trustProjectConfig
+    )
+      continue; // Do not stat, parse or diagnose an untrusted repository's settings.
+    let contents: string;
     try {
       const info = await stat(path);
       if (!info.isFile() || info.size > 1_048_576)
         throw new Error("Not a supported regular file");
-      source = await readFile(path, "utf8");
+      contents = await readFile(path, "utf8");
     } catch (error) {
-      if (index < 2 && isMissing(error)) continue;
+      if (source !== "explicit" && isMissing(error)) continue;
       throw new Error(`Cannot read SkillDispatch config: ${path}`);
     }
     let raw: unknown;
     try {
-      const document = parseDocument(source);
+      const document = parseDocument(contents);
       if (document.errors.length || document.warnings.length)
         throw new Error("Invalid YAML");
       raw = document.toJS({ maxAliasCount: 20 }) ?? {};
@@ -54,6 +76,18 @@ export async function loadConfig(options: {
         path,
       });
     const file = parsed.data;
+    if (file.hook?.trustProjectConfig !== undefined) {
+      if (source === "user")
+        config.hook.trustProjectConfig = file.hook.trustProjectConfig;
+      else
+        diagnostics.push({
+          code: "ignored_config_setting",
+          level: "warning",
+          message:
+            "hook.trustProjectConfig can only be set in user configuration.",
+          path,
+        });
+    }
     if (file.telemetry !== undefined)
       Object.assign(config.telemetry, file.telemetry);
     if (file.router?.provider !== undefined)

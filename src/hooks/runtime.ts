@@ -42,7 +42,7 @@ export async function runShadowHook(
     };
     const context = await services.loadContext(
       { ...environment, cwd: input.cwd },
-      { agent: input.agent },
+      { agent: input.agent, configMode: "hook" },
     );
     const { config, catalog, cwd } = context;
     if (!config.telemetry.enabled) return;

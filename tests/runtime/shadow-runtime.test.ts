@@ -84,7 +84,7 @@ describe("shadow hooks in strict child processes", () => {
       wire.cwd = ctx.cwd;
       const args = [host, ctx.root, ctx.cwd, ctx.home];
       await write(
-        join(ctx.cwd, ".skilldispatch.yaml"),
+        join(ctx.home, ".config/skilldispatch/config.yaml"),
         "router: {provider: mock}\n",
       );
       expect(await child("fixture", args, JSON.stringify(wire))).toEqual({
@@ -93,7 +93,7 @@ describe("shadow hooks in strict child processes", () => {
         stderr: "",
       });
       await write(
-        join(ctx.cwd, ".skilldispatch.yaml"),
+        join(ctx.home, ".config/skilldispatch/config.yaml"),
         "router: {provider: jev}\n",
       );
       expect(await child("fixture", args, JSON.stringify(wire))).toEqual({

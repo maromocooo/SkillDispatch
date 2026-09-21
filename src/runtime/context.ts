@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { loadConfig } from "../config/load.js";
+import { type ConfigMode, loadConfig } from "../config/load.js";
 import type { DiscoveryAgent, SkillDispatchConfig } from "../config/schema.js";
 import { finalizeCatalog } from "../discovery/catalog.js";
 import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
@@ -18,12 +18,17 @@ export interface RuntimeEnvironment {
 /** Shared composition only. Core never imports discovery, config or provider SDKs. */
 export async function loadRuntimeContext(
   environment: RuntimeEnvironment,
-  options: { agent?: DiscoveryAgent; configPath?: string } = {},
+  options: {
+    agent?: DiscoveryAgent;
+    configPath?: string;
+    configMode?: ConfigMode;
+  } = {},
 ) {
   const cwd = await realpath(environment.cwd);
   const { config, diagnostics } = await loadConfig({
     cwd,
     home: environment.home,
+    ...(options.configMode === undefined ? {} : { mode: options.configMode }),
     ...(options.configPath === undefined
       ? {}
       : { configPath: options.configPath }),

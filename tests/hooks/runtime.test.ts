@@ -26,7 +26,7 @@ async function setup(
   config = "router:\n  provider: mock\n  timeoutMs: 10\n  mock:\n    defaultProbability: 0.95\n",
 ) {
   const ctx = await workspace();
-  await write(join(ctx.cwd, ".skilldispatch.yaml"), config);
+  await write(join(ctx.home, ".config/skilldispatch/config.yaml"), config);
   const wire = JSON.parse(
     await readFile(
       new URL(`../fixtures/hooks/${host}.json`, import.meta.url),
@@ -262,7 +262,7 @@ describe("shared silent shadow runtime", () => {
     const overrides: Parameters<typeof runShadowHook>[2] = {};
     if (failure === "invalid_config")
       await write(
-        join(f.ctx.cwd, ".skilldispatch.yaml"),
+        join(f.ctx.home, ".config/skilldispatch/config.yaml"),
         "router: {provider: unsupported}",
       );
     if (failure === "discovery") overrides.loadContext = fail;
@@ -272,7 +272,7 @@ describe("shared silent shadow runtime", () => {
     if (failure === "blank_prompt") f.input.prompt = "  ";
     if (failure === "disabled")
       await write(
-        join(f.ctx.cwd, ".skilldispatch.yaml"),
+        join(f.ctx.home, ".config/skilldispatch/config.yaml"),
         "telemetry: {enabled: false}",
       );
     await expect(
@@ -313,7 +313,7 @@ it("does not corrupt the reserved installation key when tracePath points to it",
   const key = Buffer.alloc(32, 7);
   await writeFile(keyPath, key, { mode: 0o600 });
   await write(
-    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `telemetry:\n  tracePath: ${keyPath}\n`,
   );
   await runShadowHook(f.input, f.environment);
@@ -325,14 +325,14 @@ it("uses the configured trace path and survives a real trace-file failure", asyn
   const f = await setup();
   const path = join(f.ctx.root, "alternate/events.jsonl");
   await write(
-    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${path}\n`,
   );
   await runShadowHook(f.input, f.environment);
   expect(JSON.parse(await readFile(path, "utf8")).outcome).toBe("complete");
   await expect(f.traces()).rejects.toThrow();
   await write(
-    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${f.ctx.root}\n`,
   );
   await expect(runShadowHook(f.input, f.environment)).resolves.toBeUndefined();
@@ -367,7 +367,7 @@ it("protects the key even when data and trace paths use different parent aliases
   await symlink(f.ctx.root, alias);
   f.environment.env.SKILLDISPATCH_DATA_DIR = join(alias, "private-data");
   await write(
-    join(f.ctx.cwd, ".skilldispatch.yaml"),
+    join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${keyPath}\n`,
   );
   await runShadowHook(f.input, f.environment);

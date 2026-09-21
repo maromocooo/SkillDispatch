@@ -88,7 +88,7 @@ exits 0; inspect reliability counts as well as quality metrics.
 
 ## Configuration
 
-Read order, lowest to highest priority:
+For `discover`, `route`, and `eval`, read order is lowest to highest priority:
 
 1. Built-in defaults.
 2. `~/.config/skilldispatch/config.yaml`.
@@ -359,16 +359,40 @@ dedicated CLI hook process to 4 seconds, including setup/storage. The latter is
 an emergency cutoff; it may leave no trace. Claude's synchronous UserPromptSubmit
 hook blocks prompt processing while it runs, so keep this budget short.
 
-Each adapter uses the hook's CWD for project discovery/config, forces its own
+Each adapter uses the hook's CWD for project skill discovery, forces its own
 agent (`codex` or `claude-code`), and never routes the other host's skills.
 Required/known fields are type-checked; unknown future fields are ignored.
 Codex session/turn/model are supported. Claude supplies session correlation but
 no UserPromptSubmit model/turn ID; its optional `prompt_id` is not treated as a
 turn ID. Transcript paths are discarded without reading the file.
 
+### Hook configuration trust
+
+Global hooks ignore project `.skilldispatch.yaml` **by default**. They load
+built-in defaults and `~/.config/skilldispatch/config.yaml` only; they still
+discover project skills using the hook CWD. Reading project skills does not grant
+a repository authority over trace destinations, raw prompt storage, telemetry
+opt-out or provider/network settings.
+
+To explicitly allow project settings in hook runs, put this **in user config**:
+
+```yaml
+hook:
+  trustProjectConfig: true
+```
+
+The default is false. Only the user layer can set this switch; project or explicit
+CLI config cannot enable it. Without trust, project config is not even read or
+validated. With trust, the usual project layer can override user routing/telemetry
+settings, so enable this only for environments where those repositories are
+trusted. Hook commands have no explicit config override. Ordinary
+`discover` / `route` / `eval` retain user → project → explicit CLI layering.
+
 ### Storage and privacy
 
-Optional configuration in `.skilldispatch.yaml` or user config:
+Hook configuration belongs in `~/.config/skilldispatch/config.yaml` by default.
+A project `.skilldispatch.yaml` applies only after the user opt-in above:
+
 
 ```yaml
 telemetry:
