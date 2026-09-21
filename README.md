@@ -362,9 +362,9 @@ hook blocks prompt processing while it runs, so keep this budget short.
 Each adapter uses the hook's CWD for project skill discovery, forces its own
 agent (`codex` or `claude-code`), and never routes the other host's skills.
 Required/known fields are type-checked; unknown future fields are ignored.
-Codex session/turn/model are supported. Claude supplies session correlation but
-no UserPromptSubmit model/turn ID; its optional `prompt_id` is not treated as a
-turn ID. Transcript paths are discarded without reading the file.
+Codex session/turn/model are supported. Claude supplies session correlation and
+an optional `prompt_id` for current prompt submission correlation, but no
+UserPromptSubmit model. Transcript paths are discarded without reading the file.
 
 ### Hook configuration trust
 
@@ -393,7 +393,6 @@ trusted. Hook commands have no explicit config override. Ordinary
 Hook configuration belongs in `~/.config/skilldispatch/config.yaml` by default.
 A project `.skilldispatch.yaml` applies only after the user opt-in above:
 
-
 ```yaml
 telemetry:
   enabled: true
@@ -413,14 +412,24 @@ option for testing hook setup.
 - **`hash` (default):** HMAC-SHA256 of the exact prompt using a private, local
   32-byte random installation key. Same installation/prompt correlates; separate
   keys produce different hashes. The API key is never used as the hash key.
-- **`none`:** neither raw prompt nor prompt hash is stored. Session/turn
+- **`none`:** neither raw prompt nor prompt hash is stored. Session/submission
   correlation is still keyed and available.
 - **`raw`: explicit opt-in only.** Stores the complete hook prompt locally,
   potentially including source code, personal data or secrets. Review retention
   and file access before enabling it. It is not needed for ordinary shadow use.
 
-Session/turn values also use HMAC, with separate domains and the host agent;
-raw host IDs are not stored. New directories/files use 0700/0600 on POSIX.
+`prompt.hash` identifies **text content**: repeating identical text produces the
+same hash with the same installation key. `host.promptKey` identifies the **host
+prompt submission**: Codex `turn_id` or Claude `prompt_id`, hashed as
+`HMAC(key, "host-prompt\0" + agent + "\0" + id)`. Different host IDs produce
+different promptKeys even for identical text. Hosts are domain-separated; legacy
+Claude inputs without `prompt_id` omit promptKey rather than inventing an ID.
+`host.sessionKey` is a separate HMAC of the session. Raw host IDs are never stored.
+
+The pre-release v1 schema replaces `turnKey` with `promptKey`; schemaVersion stays
+`1.0` because PR4 is not yet merged or publicly released. Old development traces
+using turnKey do not validate against the revised schema.
+ New directories/files use 0700/0600 on POSIX.
 Key creation is race-safe; an existing key is never replaced automatically.
 Unsafe permissions, symlink destinations, corrupt keys and I/O failures cause
 silent no-op behavior rather than exposing data or blocking the host. Back up

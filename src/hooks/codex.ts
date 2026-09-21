@@ -25,7 +25,7 @@ export function parseCodexInput(input: unknown): HookInput | undefined {
     cwd: value.cwd,
     prompt: value.prompt,
     sessionId: value.session_id,
-    turnId: value.turn_id,
+    promptCorrelationId: value.turn_id,
     model: value.model,
   };
 }

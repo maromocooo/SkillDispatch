@@ -3,6 +3,6 @@ export interface HookInput {
   cwd: string;
   prompt: string;
   sessionId: string;
-  turnId?: string;
+  promptCorrelationId?: string;
   model?: string;
 }

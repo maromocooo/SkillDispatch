@@ -9,8 +9,8 @@ const schema = z.object({
   permission_mode: z.string(),
   prompt: z.string(),
   transcript_path: z.string(),
-  // Current optional common fields are type-checked, then deliberately discarded.
-  prompt_id: z.string().optional(),
+  // Keep the optional submission ID; unrelated common fields are discarded.
+  prompt_id: z.string().min(1).optional(),
   scratchpad_dir: z.string().optional(),
   agent_id: z.string().optional(),
   agent_type: z.string().optional(),
@@ -21,11 +21,14 @@ export function parseClaudeInput(input: unknown): HookInput | undefined {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return undefined;
   const value = parsed.data;
-  // prompt_id is not a turn_id; UserPromptSubmit supplies no current model.
+  // Older hosts omit prompt_id. Never infer it from session/transcript data.
   return {
     agent: "claude-code",
     cwd: value.cwd,
     prompt: value.prompt,
     sessionId: value.session_id,
+    ...(value.prompt_id === undefined
+      ? {}
+      : { promptCorrelationId: value.prompt_id }),
   };
 }

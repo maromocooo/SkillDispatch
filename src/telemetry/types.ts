@@ -17,13 +17,22 @@ export const routeTraceSchema = z
     mode: z.literal("shadow"),
     prompt: z.discriminatedUnion("storage", [
       z.strictObject({ storage: z.literal("none") }),
-      z.strictObject({ storage: z.literal("hash"), hash: digestSchema }),
+      z.strictObject({
+        storage: z.literal("hash"),
+        hash: digestSchema.describe(
+          "Installation-local HMAC of exact prompt text; identical text correlates across submissions.",
+        ),
+      }),
       z.strictObject({ storage: z.literal("raw"), raw: z.string() }),
     ]),
     host: z.strictObject({
       event: z.literal("UserPromptSubmit"),
       sessionKey: digestSchema.optional(),
-      turnKey: digestSchema.optional(),
+      promptKey: digestSchema
+        .describe(
+          "Installation-local HMAC of the host prompt submission ID (Codex turn_id or Claude prompt_id), separated by host. Different submission IDs produce different keys even for identical prompt text.",
+        )
+        .optional(),
       model: safeModelSchema.optional(),
     }),
     catalog: z.strictObject({

@@ -92,7 +92,9 @@ export async function runShadowHook(
       agent: input.agent,
       prompt: input.prompt,
       sessionId: input.sessionId,
-      ...(input.turnId === undefined ? {} : { turnId: input.turnId }),
+      ...(input.promptCorrelationId === undefined
+        ? {}
+        : { promptCorrelationId: input.promptCorrelationId }),
       ...(input.model === undefined ? {} : { hostModel: input.model }),
       skills: catalog.skills,
       result,

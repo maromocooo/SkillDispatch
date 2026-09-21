@@ -35,9 +35,12 @@ describe.each(["codex", "claude"] as const)("%s hook input", (host) => {
       /transcript|unknown_future|agent_id|permission_mode/,
     );
     if (host === "codex")
-      expect(input).toMatchObject({ turnId: raw.turn_id, model: raw.model });
+      expect(input).toMatchObject({
+        promptCorrelationId: raw.turn_id,
+        model: raw.model,
+      });
     else {
-      expect(input?.turnId).toBeUndefined();
+      expect(input?.promptCorrelationId).toBe(raw.prompt_id);
       expect(input?.model).toBeUndefined();
     }
   });
@@ -89,7 +92,7 @@ describe("hook wire details and bounded stdin", () => {
       effort: { level: "max" },
     });
     expect(result?.model).toBeUndefined();
-    expect(result?.turnId).toBeUndefined();
+    expect(result?.promptCorrelationId).toBe(raw.prompt_id);
     for (const field of ["prompt_id", "scratchpad_dir", "effort"])
       expect(parseClaudeInput({ ...raw, [field]: 42 })).toBeUndefined();
   });

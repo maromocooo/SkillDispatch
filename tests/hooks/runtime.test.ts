@@ -124,6 +124,7 @@ describe("shared silent shadow runtime", () => {
       ).toBe(false);
       expect(fetch).not.toHaveBeenCalled();
       if (host === "claude") {
+        expect(trace?.host.promptKey).toMatch(/^[a-f0-9]{64}$/);
         expect(trace?.host).not.toHaveProperty("turnKey");
         expect(trace?.host).not.toHaveProperty("model");
         expect(text).not.toContain(f.wire.prompt_id);

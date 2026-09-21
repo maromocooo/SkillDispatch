@@ -3,7 +3,7 @@ import type { PromptStorage, RouteTrace } from "./types.js";
 
 export function keyedHash(
   key: Uint8Array,
-  domain: "prompt" | "session" | "turn",
+  domain: "prompt" | "session" | "host-prompt",
   value: string,
 ): string {
   if (key.byteLength < 32) throw new Error("Invalid installation key.");

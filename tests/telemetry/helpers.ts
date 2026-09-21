@@ -27,7 +27,7 @@ export const traceInput = () => ({
   agent: "codex" as const,
   prompt: "PRIVATE_PROMPT_SENTINEL",
   sessionId: "PRIVATE_SESSION",
-  turnId: "PRIVATE_TURN",
+  promptCorrelationId: "PRIVATE_TURN",
   hostModel: "gpt-fixture",
   key: Buffer.alloc(32, 1),
   skills: [skill()],

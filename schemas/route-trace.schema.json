@@ -46,7 +46,8 @@
             },
             "hash": {
               "type": "string",
-              "pattern": "^[a-f0-9]{64}$"
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Installation-local HMAC of exact prompt text; identical text correlates across submissions."
             }
           },
           "required": ["storage", "hash"],
@@ -79,9 +80,10 @@
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         },
-        "turnKey": {
+        "promptKey": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Installation-local HMAC of the host prompt submission ID (Codex turn_id or Claude prompt_id), separated by host. Different submission IDs produce different keys even for identical prompt text."
         },
         "model": {
           "type": "string",

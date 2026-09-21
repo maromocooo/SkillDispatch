@@ -20,7 +20,7 @@ export interface TraceInput {
   agent: RouteTrace["agent"];
   prompt: string;
   sessionId: string;
-  turnId?: string;
+  promptCorrelationId?: string;
   hostModel?: string;
   skills: readonly SkillDescriptor[];
   result: RouteResult;
@@ -72,9 +72,15 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
     host: {
       event: "UserPromptSubmit",
       sessionKey: keyedHash(key, "session", `${agent}\0${input.sessionId}`),
-      ...(input.turnId === undefined
+      ...(input.promptCorrelationId === undefined
         ? {}
-        : { turnKey: keyedHash(key, "turn", `${agent}\0${input.turnId}`) }),
+        : {
+            promptKey: keyedHash(
+              key,
+              "host-prompt",
+              `${agent}\0${input.promptCorrelationId}`,
+            ),
+          }),
       ...(hostModel.success ? { model: hostModel.data } : {}),
     },
     catalog: {

@@ -54,8 +54,12 @@ describe("route trace v1 privacy and schema", () => {
     );
     expect(
       new Set(
-        ["prompt", "session", "turn"].map((domain) =>
-          keyedHash(key, domain as "prompt" | "session" | "turn", "same"),
+        ["prompt", "session", "host-prompt"].map((domain) =>
+          keyedHash(
+            key,
+            domain as "prompt" | "session" | "host-prompt",
+            "same",
+          ),
         ),
       ).size,
     ).toBe(3);
@@ -83,7 +87,7 @@ describe("route trace v1 privacy and schema", () => {
       code === "provider_partial" ? "partial" : "failed",
     );
   });
-  it("does not invent model/turn metadata and discards unsafe model strings", () => {
+  it("does not invent model/prompt-submission metadata and discards unsafe model strings", () => {
     const input = traceInput();
     const trace = createRouteTrace({
       ...input,
@@ -99,8 +103,12 @@ describe("route trace v1 privacy and schema", () => {
     });
     expect(trace.host.model).toBeUndefined();
     expect(trace.router.model).toBeUndefined();
-    const { turnId: _turn, hostModel: _model, ...without } = input;
-    expect(createRouteTrace(without).host.turnKey).toBeUndefined();
+    const {
+      promptCorrelationId: _submission,
+      hostModel: _model,
+      ...without
+    } = input;
+    expect(createRouteTrace(without).host.promptKey).toBeUndefined();
   });
   it("has no runtime/JSON Schema drift", async () => {
     const shipped = JSON.parse(
@@ -123,6 +131,7 @@ describe("route trace v1 privacy and schema", () => {
       diagnostics: [{ code: "warning", level: "warning", message: "private" }],
     },
     { host: { event: "UserPromptSubmit", session_id: "raw" } },
+    { host: { event: "UserPromptSubmit", turnKey: digest("retired") } },
   ])(
     "rejects extra fields and invalid privacy combinations %#",
     async (extra) => {
