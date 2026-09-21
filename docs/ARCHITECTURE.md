@@ -1,10 +1,10 @@
 # Architecture
 
-## Implemented PR2 boundary
+## Implemented PR3 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
-library and CLI entry points. Discovery, Jev routing and offline mock routing are active.
-The sections describing hooks, telemetry and eval below are the roadmap.
+library and CLI entry points. Discovery, Jev/mock routing and routing evaluation are active.
+The sections describing hooks and telemetry below are the roadmap.
 
 ```text
 cli/program + commands
@@ -15,6 +15,8 @@ cli/program + commands
        -> core/policy
   -> providers/jev | providers/mock (chosen by the CLI composition root)
        -> jev/client -> @typesafe-ai/sdk (Jev only)
+  -> eval/schema -> eval/resolve -> eval/runner -> core/route
+       -> eval/metrics (pure scoring and aggregation)
 ```
 
 `RouterProvider.judge` is the provider contract. Every eligible candidate must be
@@ -40,7 +42,8 @@ The CLI returns structured JSON with no raw prompt and no persistent writes.
 The future trace schema is retained as a design artifact only.
 
 Configuration accepts `jev` (default) or explicit `mock`. Unsupported providers
-error; unknown fields warn. No hook, telemetry, or eval stub is shipped.
+error; unknown config fields warn. Eval input uses its own strict versioned schema.
+No hook or telemetry stub is shipped.
 
 See [README](../README.md) for supported paths, current host differences,
 configuration precedence and known discovery boundaries.
@@ -159,8 +162,11 @@ The request is `systemOne({ model, state, questions })`:
   keys, wrong types and invalid scores invalidate that chunk. Answer object order
   is immaterial. `noul` becomes `probability` without rounding or calibration.
 
-A bounded worker pool processes at most `concurrency` chunks (default 2). Results
-are stored by chunk index, so completion order does not change decision or
+A bounded worker pool processes at most `concurrency` chunks (default 2), with
+a local ceiling of `MAX_JEV_CONCURRENCY = 8` workers (valid range 1–8),
+introduced in PR3 to bound burst/cost from configuration mistakes. This is not
+a TypeSafe API concurrency limit. Results are stored by chunk index, so
+completion order does not change decision or
 diagnostic ordering. The default and local maximum `chunkSize` is 48. Official
 OpenAPI publishes no question-count maximum; official model limits are token-based.
 48 is a conservative application bound, not a promise to fit every prompt/catalog
@@ -200,8 +206,86 @@ those fields is not automatically redacted. Discovery remains entirely local.
 
 Independent Noul is a multi-label baseline, not competitive selection. Similar or
 broad skills may all score highly. Neither global threshold calibration nor
-catalog-specific accuracy is established. The future eval layer must measure
-this before any stronger accuracy claim or alternative strategy is adopted.
+catalog-specific accuracy is established. The eval layer measures behavior
+before any stronger accuracy claim or alternative strategy is adopted.
+
+## Routing evaluation (PR3)
+
+`eval/schema.ts` loads regular YAML files up to 1 MiB, bounds alias expansion,
+rejects cycles, duplicate keys and unknown fields, and validates version 1.
+Datasets require at least one case; case IDs are unique and prompts nonblank.
+Parser/schema errors have fixed messages and codes rather than source excerpts.
+`should` / `should_not` default to `[]`; `fully_labeled` defaults to false.
+Optional file gates use `min_precision` / `min_recall`, each in [0, 1].
+
+`eval/resolve.ts` resolves `{name, agent?, scope?}` selectors against the complete
+discovered catalog, including disabled skills. Names are case-sensitive after
+whitespace normalization. Zero matches fail with `unknown_eval_skill`; multiple
+matches fail with `ambiguous_eval_skill`. Agent qualifiers distinguish hosts;
+scope qualifiers can distinguish repo/user duplicates. If those still leave more
+than one match, the dataset cannot uniquely label that skill and fails. No paths
+or machine-specific IDs are required in datasets. Duplicate catalog IDs,
+duplicate resolved labels and overlapping positive/negative labels are errors.
+All cases are resolved before the first provider request.
+
+`eval/runner.ts` takes a snapshot of catalog routing fields, validates policy and
+gates, then routes cases sequentially in file order. It delegates to the existing
+core `route()` with one provider instance; the CLI's `routingForCommand` is shared
+by route and eval for config/discovery/provider selection. There is no eval-only
+network client, timeout policy, router algorithm or automatic retry layer.
+Core remains independent of eval and SDK types. Disabled labeled positives remain
+false negatives, making discovery/eligibility changes visible to regression tests.
+
+`eval/metrics.ts` scores actual selected sets and aggregates pure count-based
+metrics. A partial-label case recognizes only `should` as positive and
+`should_not` as negative; unlisted selected skills go to `unlabeledSelected`.
+For fully labeled cases, all selected skills outside `should` are false positives.
+Exact-set matching compares the full selected ID set with the resolved positives,
+and only fully labeled cases enter its denominator. No-skill expectations and
+empty selections are a valid exact match.
+
+Precision/recall/F1 are micro metrics: TP/(TP+FP), TP/(TP+FN), and
+2TP/(2TP+FP+FN). Every zero denominator gives `null`. Thus F1 is zero for an
+all-false-positive or all-false-negative result even if precision or recall is
+undefined. Average selected skills includes unlabeled predictions. Latency is
+core route time, excluding setup/discovery; P50/P95 use sorted nearest rank
+`ceil(p * count) - 1`. The internal aggregator also returns null ratios/latencies
+for an empty input, though datasets require at least one case.
+
+`provider_failed`, `provider_timeout`, and `invalid_provider_response` mark a
+case as failed and increment `providerFailureCount`. `provider_partial` marks
+partial and increments `providerPartialCount`, including all-failed partials.
+These cases are never removed from quality metrics: actual recommendations (or
+their absence) are scored normally. Failure on a negative case can therefore
+coincide with an exact match; consumers must also inspect reliability counts.
+PR3 has only precision/recall gates, no implicit reliability gate.
+
+The version-1 result contains policy, ordered cases, metrics, gate outcomes and
+diagnostic codes/levels/skill IDs. Each case includes selected probabilities,
+TP/FP/FN/unlabeled lists, `fullyLabeled`, nullable `exactMatch`, latency and
+provider/model/partial/failed metadata. No prompt, body, path, arbitrary metadata,
+provider diagnostic message or reason code is copied into evaluation output.
+Allowed metadata (case IDs, skill names, safe provider/model/codes) is not a secret
+redaction service; provider contracts still require safe diagnostic fields.
+YAML prompt content is sent to the selected provider but never persisted by eval.
+
+Given the same catalog, dataset, scores and policy, ordering and count metrics
+are deterministic. Core ranking is retained for selections; label and diagnostic
+ordering uses the existing locale-independent comparison. Live API responses and
+measured latency can vary. Pin catalog descriptions/config/dataset and a stable
+model where available for comparisons; no run registry or persistent traces exist.
+
+CLI gates override file gates per field and compare inclusively. An undefined
+metric cannot pass a requested gate, even at zero. Completed results exit 0 unless
+a gate fails (exit 2); setup/input errors exit 1. Gate failure still emits the full
+JSON result. Public library exports are `parseEvalYaml`, `loadEvalFile`,
+`runEvaluation`, `EvalInputError`, and their input/result types; scoring and
+resolution helpers stay internal. See [PR3 validation](PR3_VALIDATION.md).
+
+Implementing independent Noul does not establish routing accuracy. Evals measure
+explicit/implicit/multiple/no-skill, overlapping or broad/specific, negated and
+multilingual cases before accuracy claims. Fixture scores test the measurement
+pipeline, not Jev semantics. No threshold tuning or alternate router is added.
 
 ## TraceSink (roadmap)
 

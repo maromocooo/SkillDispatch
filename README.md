@@ -133,7 +133,7 @@ scores. Diagnostics contain fixed safe messages, not SDK error text or stacks.
 Independent Noul is the initial multi-label baseline. Similar or broad skills may
 all score highly; these judgments do not compete with one another. Thresholds
 are not claimed to be globally optimal or calibrated for arbitrary catalogs.
-The future eval layer must measure routing quality before stronger claims.
+Use the eval layer to measure routing quality before making stronger claims.
 
 For offline development, explicitly set `router.provider: mock`.
 Without fixture scores, the mock performs case-insensitive token overlap over
@@ -215,6 +215,90 @@ Boundaries and limitations:
   is deferred. Malformed config yields diagnostics; known explicit-only skills
   remain excluded. Review diagnostics before relying on the catalog.
 
+## Routing evaluation
+
+`eval` discovers the catalog once and runs cases in file order through the same
+provider, policy and timeout as `route`. No provider fallback occurs. First adapt
+the names in [evals/example.yaml](evals/example.yaml) to your discovered skills:
+
+```yaml
+version: 1
+cases:
+  - id: frontend-form
+    prompt: "Build the React form and add tests."
+    should:
+      - {name: react-patterns, agent: codex, scope: repo}
+      - {name: frontend-testing, agent: codex, scope: repo}
+    should_not:
+      - {name: deployment, agent: codex, scope: repo}
+    fully_labeled: false
+```
+
+Names are case-sensitive and whitespace-normalized. Optional `agent` and `scope`
+qualify a selector; it must resolve to exactly one skill. Missing and ambiguous
+matches produce `unknown_eval_skill` and `ambiguous_eval_skill`, before any
+requests. Qualify same-agent repo/user duplicates by scope. Duplicate labels and
+positive/negative overlap are errors, including different selectors resolving to
+the same ID. Disabled skills remain resolvable: an expected disabled skill is a
+false negative because automatic routing cannot select it. Case IDs must be
+unique, prompts nonblank, and unknown YAML fields are rejected.
+
+`should` and `should_not` default to empty arrays. With `fully_labeled: false`
+(the default), unlisted skills are **unlabeled**, not negative. With `true`, every
+available skill outside `should` is negative. Only fully labeled cases contribute
+to exact-set accuracy. Keep that flag false unless the entire catalog is labeled.
+
+Metrics sum counts across cases (micro aggregation):
+
+- **Labeled precision** = TP / (TP + FP). In partial-label cases only selected
+  explicit `should_not` skills count as FP; unlabeled selections are reported
+  separately and excluded from this denominator. Fully labeled cases use ordinary
+  precision. A high labeled precision alone says nothing about unlabeled skills.
+- **Recall** = TP / (TP + FN); **F1** = 2TP / (2TP + FP + FN).
+- A zero denominator is `null` (`n/a` in text), never NaN. F1 can be 0 when
+  precision or recall is undefined but FP or FN exists.
+- **Exact-set accuracy** = matching fully labeled cases / all fully labeled
+  cases; `null` when there are none. An empty expected/selected set matches.
+- Average selected skills counts all selections, including unlabeled ones.
+  P50/P95 use nearest-rank route latency, excluding discovery and file loading.
+
+```sh
+# Real Jev: requires TYPESAFE_API_KEY and sends dataset prompts to TypeSafe.
+skilldispatch eval evals/example.yaml --json
+skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
+# Explicit offline fixture provider; these scores are NOT Jev quality measurements.
+skilldispatch eval evals/example.yaml --config examples/skilldispatch.mock.yaml
+```
+
+The dataset path is relative to the invocation directory; `--cwd` controls
+discovery, project config and relative `--config`. Eval accepts route's
+`--agent`, `--threshold` and `--max-skills`. Optional YAML
+`gates: {min_recall: 0.90, min_precision: 0.90}` sets gates; CLI flags override
+each field. Bounds are inclusive 0–1. Undefined metrics fail a requested gate,
+even a zero gate. JSON still contains the complete result on gate failure.
+
+Failures are evaluated, never removed: `provider_failed`, `provider_timeout`,
+and `invalid_provider_response` count toward `providerFailureCount` and their
+empty selections can create false negatives. `provider_partial` increments
+`providerPartialCount`; successful decisions remain, missing recommendations
+affect quality normally. An all-failed partial result counts as partial, not as a
+core contract failure. Without gates these results exit 0, so also inspect the
+reliability counts. There is no separate reliability gate in PR3.
+
+Results contain case IDs, skill references/probabilities, FP/FN lists, metrics,
+provider/model, latency and diagnostic codes; **no raw prompts, diagnostic message
+bodies, local paths or full skills**. Nothing is persisted. Jev still receives
+the prompt and allowed skill descriptions as described above. Manual live eval
+is opt-in by running the command with Jev credentials; tests/CI/prepack never
+call the external API.
+
+Independent Noul routing quality is not established merely by implementing a
+provider. SkillDispatch uses evals before making accuracy claims. Similar or broad
+skills may all score highly; thresholds are not universally calibrated. The
+example dataset illustrates explicit/implicit/multiple/no-skill, overlapping,
+negated, Japanese and mixed-language requests; tailor labels and broad/specific
+skill pairs to your catalog. No automatic threshold tuning or reranking is added.
+
 ## Library and architecture
 
 ```ts
@@ -241,13 +325,15 @@ src/
   discovery/    Parser, safe traversal, Codex and Claude adapters
   providers/    RouterProvider contract, deterministic mock and Jev SDK boundary
   config/       YAML validation and layered loading
-  cli/          Composition root and discover/route commands
+  eval/         YAML schema, selector resolution, metrics and sequential runner
+  cli/          Shared composition root and discover/route/eval commands
 tests/
   fixtures/     Valid/invalid skills, scope layouts and score fixtures
   discovery/    Parser, scopes, duplicates, symlinks, disabled skills
   routing/      Policy, provider isolation, validation, timeout and failure
   providers/    Jev mapping, chunking, concurrency, privacy and partial failures
   runtime/      Real SDK + loopback HTTP in strict child processes
+  eval/         Input, labels, metrics, reliability, privacy and dataset fixtures
   config/       Config precedence and diagnostics
   cli/          Command output, filtering, multi-skill routing and errors
 ```
@@ -300,5 +386,6 @@ It is never run by `pnpm test` or CI automatically.
 Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
 HTTP in child processes. Format with `pnpm format`. See
-[PR2 validation](docs/PR2_VALIDATION.md) for runtime and package checks.
-Hooks, telemetry, eval execution and Studio remain later work.
+[PR3 validation](docs/PR3_VALIDATION.md) for eval, runtime and package checks, and
+[PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
+Hooks, telemetry/JSONL traces and Studio remain later work.
