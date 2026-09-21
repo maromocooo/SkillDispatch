@@ -20,6 +20,15 @@ async function run(args: string[], environment: CliEnvironment) {
   return { stdout, stderr };
 }
 
+async function mockWorkspace() {
+  const ctx = await workspace();
+  await write(
+    join(ctx.cwd, ".skilldispatch.yaml"),
+    "router:\n  provider: mock\n",
+  );
+  return ctx;
+}
+
 describe("skilldispatch CLI", () => {
   it("discovers both agent catalogs as a single valid JSON document", async () => {
     const ctx = await workspace();
@@ -56,7 +65,7 @@ describe("skilldispatch CLI", () => {
     expect(stderr).toContain("invalid_yaml");
   });
   it("routes to multiple skills, returns all decisions and never echoes the prompt", async () => {
-    const ctx = await workspace();
+    const ctx = await mockWorkspace();
     const prompt =
       "Build a React form and write tests; check keyboard accessibility -- private request";
     const { stdout, stderr } = await run(["route", prompt, "--json"], ctx);
@@ -81,13 +90,13 @@ describe("skilldispatch CLI", () => {
   it("selects nothing for unrelated prompts and explains the mock in text mode", async () => {
     const output = await run(
       ["route", "Fix the typo in README"],
-      await workspace(),
+      await mockWorkspace(),
     );
     expect(output.stdout).toContain("No skills selected.");
     expect(output.stdout).toContain("offline mock");
   });
   it("applies CLI flags after file policy and supports fixture scores", async () => {
-    const ctx = await workspace();
+    const ctx = await mockWorkspace();
     await write(
       join(ctx.cwd, "custom.yaml"),
       "router:\n  mock:\n    defaultProbability: 0.04\n    scores:\n      react-patterns: 0.95\n      frontend-testing: 0.91\npolicy:\n  threshold: 1\n",

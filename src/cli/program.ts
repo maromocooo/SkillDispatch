@@ -37,7 +37,7 @@ export function createProgram(environment: CliEnvironment, io: CliIO): Command {
   common(
     program
       .command("route")
-      .description("Route a prompt with the offline mock provider")
+      .description("Route a prompt with the configured provider (default: Jev)")
       .argument("<prompt>", "natural-language request"),
   )
     .option(

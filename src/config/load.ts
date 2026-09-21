@@ -43,7 +43,7 @@ export async function loadConfig(options: {
     if (!parsed.success) {
       // Zod/YAML error strings may contain secrets from an unrelated config key.
       throw new Error(
-        `Invalid SkillDispatch config: ${path}. Check provider, probabilities, limits and agent names; PR1 supports provider 'mock' only.`,
+        `Invalid SkillDispatch config: ${path}. Check provider, probabilities, limits and agent names.`,
       );
     }
     for (const key of unknownKeys(raw, parsed.data))
@@ -58,6 +58,8 @@ export async function loadConfig(options: {
       config.router.provider = file.router.provider;
     if (file.router?.timeoutMs !== undefined)
       config.router.timeoutMs = file.router.timeoutMs;
+    if (file.router?.jev !== undefined)
+      Object.assign(config.router.jev, file.router.jev);
     if (file.router?.mock?.scores !== undefined)
       config.router.mock.scores = {
         ...config.router.mock.scores,

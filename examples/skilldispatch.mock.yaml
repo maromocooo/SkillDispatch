@@ -1,0 +1,21 @@
+# Copy to .skilldispatch.yaml or ~/.config/skilldispatch/config.yaml.
+# Explicit offline fixture provider; scores are not real judgments.
+router:
+  provider: mock
+  timeoutMs: 2500
+  # Optional deterministic fixture scores, keyed by skill ID or name.
+  # Omit mock to use the simple token-overlap fallback.
+  mock:
+    defaultProbability: 0.04
+    scores:
+      react-patterns: 0.95
+      frontend-testing: 0.91
+      accessibility-review: 0.88
+      deployment: 0.04
+policy:
+  threshold: 0.75
+  maxSkills: 4
+discovery:
+  agents:
+    - codex
+    - claude-code

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/load.js";
+import { defaultJevOptions } from "../../src/providers/jev/options.js";
 import { workspace, write } from "../helpers.js";
 
 describe("SkillDispatch configuration", () => {
@@ -20,7 +21,12 @@ describe("SkillDispatch configuration", () => {
     const ctx = await workspace();
     const { config, diagnostics } = await loadConfig(ctx);
     expect(config).toEqual({
-      router: { provider: "mock", timeoutMs: 2500, mock: {} },
+      router: {
+        provider: "jev",
+        timeoutMs: 2500,
+        mock: {},
+        jev: defaultJevOptions(),
+      },
       policy: { threshold: 0.75, maxSkills: 4 },
       discovery: { agents: ["codex", "claude-code"] },
     });
@@ -63,7 +69,7 @@ describe("SkillDispatch configuration", () => {
     "policy: [broken",
     "policy:\n  threshold: 2",
     "policy:\n  maxSkills: 0",
-    "router:\n  provider: jev",
+    "router:\n  provider: invalid",
     "discovery:\n  agents: [unknown]",
     "router:\n  mock:\n    scores:\n      skill: .nan",
   ])("rejects invalid config (%s)", async (source) => {

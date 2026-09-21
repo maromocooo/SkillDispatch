@@ -3,21 +3,29 @@ import { z } from "zod";
 // Local safety ceiling, not a claimed API question-count limit. See PR2_VALIDATION.
 export const MAX_JEV_CHUNK_SIZE = 48;
 export const jevOptionsSchema = z.object({
-  model: z
-    .string()
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/)
-    .default("jev-latest"),
-  chunkSize: z.number().int().min(1).max(MAX_JEV_CHUNK_SIZE).default(48),
-  concurrency: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(2),
-  requestTimeoutMs: z.number().int().min(1).max(2_147_483_647).default(1800),
-  maxRetries: z.number().int().min(0).max(2).default(0),
+  model: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/),
+  chunkSize: z.number().int().min(1).max(MAX_JEV_CHUNK_SIZE),
+  concurrency: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  requestTimeoutMs: z.number().int().min(1).max(2_147_483_647),
+  maxRetries: z.number().int().min(0).max(2),
 });
 
-export type JevOptions = z.input<typeof jevOptionsSchema>;
 export type ResolvedJevOptions = z.output<typeof jevOptionsSchema>;
+export type JevOptions = Partial<ResolvedJevOptions>;
+
+export const defaultJevOptions = (): ResolvedJevOptions => ({
+  model: "jev-latest",
+  chunkSize: 48,
+  concurrency: 2,
+  requestTimeoutMs: 1800,
+  maxRetries: 0,
+});
 
 export function resolveJevOptions(options: JevOptions): ResolvedJevOptions {
-  const result = jevOptionsSchema.safeParse(options);
+  const result = jevOptionsSchema.safeParse({
+    ...defaultJevOptions(),
+    ...options,
+  });
   if (!result.success) throw new Error("Invalid Jev provider options.");
   return result.data;
 }

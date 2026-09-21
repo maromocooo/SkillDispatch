@@ -11,6 +11,7 @@ const program = createProgram(
     env: {
       CODEX_HOME: process.env.CODEX_HOME,
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+      TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
     },
   },
   {

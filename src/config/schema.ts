@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { RoutingPolicy } from "../core/types.js";
+import {
+  defaultJevOptions,
+  jevOptionsSchema,
+  type ResolvedJevOptions,
+} from "../providers/jev/options.js";
 import type { MockProviderOptions } from "../providers/mock.js";
 
 export const discoveryAgentSchema = z.enum(["codex", "claude-code"]);
@@ -14,8 +19,9 @@ export const maxSkillsSchema = z
 export const configFileSchema = z.object({
   router: z
     .object({
-      provider: z.literal("mock").optional(),
+      provider: z.enum(["jev", "mock"]).optional(),
       timeoutMs: z.number().int().min(1).max(2_147_483_647).optional(),
+      jev: jevOptionsSchema.partial().optional(),
       mock: z
         .object({
           scores: z.record(z.string(), probabilitySchema).optional(),
@@ -36,13 +42,23 @@ export const configFileSchema = z.object({
 });
 
 export interface SkillDispatchConfig {
-  router: { provider: "mock"; timeoutMs: number; mock: MockProviderOptions };
+  router: {
+    provider: "jev" | "mock";
+    timeoutMs: number;
+    mock: MockProviderOptions;
+    jev: ResolvedJevOptions;
+  };
   policy: RoutingPolicy;
   discovery: { agents: DiscoveryAgent[] };
 }
 
 export const defaultConfig = (): SkillDispatchConfig => ({
-  router: { provider: "mock", timeoutMs: 2500, mock: {} },
+  router: {
+    provider: "jev",
+    timeoutMs: 2500,
+    mock: {},
+    jev: defaultJevOptions(),
+  },
   policy: { threshold: 0.75, maxSkills: 4 },
   discovery: { agents: ["codex", "claude-code"] },
 });

@@ -1,4 +1,5 @@
 import { route } from "../../core/route.js";
+import { JevRouterProvider } from "../../providers/jev.js";
 import { MockRouterProvider } from "../../providers/mock.js";
 import {
   type CliEnvironment,
@@ -18,6 +19,14 @@ export async function routeCommand(
     options,
     environment,
   );
+  const apiKey = environment.env.TYPESAFE_API_KEY;
+  const provider =
+    config.router.provider === "mock"
+      ? new MockRouterProvider(config.router.mock)
+      : new JevRouterProvider({
+          ...config.router.jev,
+          ...(apiKey === undefined ? {} : { apiKey }),
+        });
   const result = await route(
     {
       prompt,
@@ -25,7 +34,7 @@ export async function routeCommand(
       agent: agents.length === 1 ? (agents[0] ?? "generic") : "generic",
       skills: catalog.skills,
     },
-    new MockRouterProvider(config.router.mock),
+    provider,
     config.policy,
     { timeoutMs: config.router.timeoutMs },
   );
@@ -42,8 +51,10 @@ export async function routeCommand(
     return;
   }
   io.stdout(
-    `Provider: ${result.router.provider} (offline mock; scores are not calibrated)\n`,
+    `Provider: ${result.router.provider}${result.router.provider === "mock" ? " (offline mock; scores are not calibrated)" : ""}\n`,
   );
+  if (result.router.model !== undefined)
+    io.stdout(`Model: ${terminalText(result.router.model)}\n`);
   if (!selected.length) io.stdout("No skills selected.\n");
   for (const decision of selected)
     io.stdout(

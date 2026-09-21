@@ -3,12 +3,11 @@
 **Universal, observable skill routing for coding agents.**
 
 SkillDispatch discovers local coding-agent skills and routes one prompt to **zero
-or multiple skills**. PR1 provides Codex and Claude Code discovery, a normalized
-catalog, pure selection policy, and an offline deterministic mock provider.
+or multiple skills**. It provides Codex and Claude Code discovery, a normalized
+catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR1 development preview. Mock scores test the routing pipeline; they
-are not calibrated relevance probabilities. Jev, hooks, telemetry, `doctor`, eval
-execution, and Agent Skill Studio are not implemented. The handoff and trace
+**Status:** PR2 development preview. Routing quality has not been evaluated yet.
+Hooks, telemetry, `doctor`, eval execution, and Agent Skill Studio are not implemented. The handoff and trace
 schema describe the future runtime, not the current CLI surface.
 
 ## Install from source
@@ -32,8 +31,12 @@ npm install --global ./skilldispatch-0.1.0-dev.1.tgz
 skilldispatch --version
 ```
 
-PR1 makes no runtime network requests and needs no API key. Discovery does not
-execute skill scripts, Markdown substitutions, or instructions.
+Discovery is offline and needs no API key. It does not execute skill scripts,
+Markdown substitutions, or instructions. Routing defaults to **Jev** and sends
+request content to TypeSafe. Obtain a key from the [TypeSafe console](https://console.typesafe.ai/)
+and set `TYPESAFE_API_KEY` using your shell or secrets manager before routing.
+Never put credentials in YAML or commit them. Missing, blank, whitespace/control-containing
+or non-ASCII credentials are rejected before any request. There is no silent mock fallback.
 
 ## CLI
 
@@ -63,11 +66,13 @@ only the same agent and whitespace-normalized name (case-sensitive).
 `diagnostics`. Decisions include IDs, names, paths, probabilities and selection
 flags. Raw prompts and full skill bodies are not emitted or stored. Ordering and
 mock scores are deterministic; measured `router.latencyMs` varies. The provider
-is identified as `mock` in both output formats.
+is identified as `jev` or `mock` in both output formats. Jev text output also
+prints `Model:` when the API returns a consistent model across successful chunks;
+JSON includes `router.model` and `router.latencyMs`.
 
 Exit status is 0 for successful commands, empty selections, partial discovery,
 and fail-open provider failures (inspect diagnostics). Invalid CLI options,
-invalid configuration, or an inaccessible CWD return a nonzero status. `--json`
+invalid configuration/credentials, or an inaccessible CWD return a nonzero status. `--json`
 applies to successful command results; usage/config errors are reported on stderr.
 
 ## Configuration
@@ -86,8 +91,14 @@ values fail with a concise error. Configuration files are never created for you.
 
 ```yaml
 router:
-  provider: mock
+  provider: jev
   timeoutMs: 2500
+  jev:
+    model: jev-latest
+    chunkSize: 48
+    concurrency: 2
+    requestTimeoutMs: 1800
+    maxRetries: 0
 policy:
   threshold: 0.75
   maxSkills: 4
@@ -95,23 +106,53 @@ discovery:
   agents: [codex, claude-code]
 ```
 
+Jev asks one independent **Noul** per candidate, mapping `noul` directly to
+`probability` (never Choice confidence). Candidates sort by stable ID, with up to
+48 per request and two concurrent requests by default. `chunkSize` accepts 1–48;
+48 is a local safety ceiling, not an advertised API count limit. The current API
+publishes token limits instead (see [PR2 validation](docs/PR2_VALIDATION.md)).
+`concurrency` is a positive integer; request timeout is a positive 32-bit integer.
+Retries default to 0 (configurable 0–2) to avoid delaying the agent prompt path.
+`requestTimeoutMs` bounds each attempt; `timeoutMs` bounds the whole route.
+
+Successful chunks survive another chunk's failure via the existing partial
+contract. A request timeout or cancellation stops new chunks. The overall route
+deadline still fails open with no recommendations. Failures never produce mock
+scores. Diagnostics contain fixed safe messages, not SDK error text or stacks.
+
+Independent Noul is the initial multi-label baseline. Similar or broad skills may
+all score highly; these judgments do not compete with one another. Thresholds
+are not claimed to be globally optimal or calibrated for arbitrary catalogs.
+The future eval layer must measure routing quality before stronger claims.
+
+For offline development, explicitly set `router.provider: mock`.
 Without fixture scores, the mock performs case-insensitive token overlap over
 skill names/descriptions: 0.9 for a match, 0.04 otherwise. It does not understand
 intent, negation, paraphrases, or multilingual semantics. The policy selects
 `probability >= threshold`, caps the result at `maxSkills`, and sorts by
 probability descending, then name and ID in locale-independent order.
 
-For exact fixture scores, see [the working example](examples/skilldispatch.config.yaml):
+For exact fixture scores, see [the working example](examples/skilldispatch.mock.yaml):
 
 ```sh
-skilldispatch route "Any fixture prompt" --config examples/skilldispatch.config.yaml --json
+skilldispatch route "Any fixture prompt" --config examples/skilldispatch.mock.yaml --json
 ```
 
 Configured scores are **prompt-independent**. Keys can be skill IDs or names;
 an ID overrides a name. `router.mock.defaultProbability` controls unlisted skills.
 No skill is forced when none passes the threshold.
 
-The future trace location is `~/.local/share/skilldispatch/traces.jsonl`. PR1 does
+Jev sends the raw **prompt**, requesting agent, and each candidate's **name,
+description, host agent and scope** to `https://api.typesafe.ai/v1/systemone`.
+Full SKILL.md bodies, paths, absolute CWD, skill IDs and arbitrary metadata are
+not added to requests. Descriptions include discovery-normalized fallbacks;
+anything you include in a prompt or description is therefore sent. The API key
+is used only for authentication, never in model input or diagnostics. SDK debug
+logging and environment endpoint overrides are disabled. Responses are buffered
+before SDK stream cloning to avoid the Node 20 cancellation issue; see
+[the validation notes](docs/PR2_VALIDATION.md) for tests and limitations.
+
+The future trace location is `~/.local/share/skilldispatch/traces.jsonl`. PR2 does
 not write traces and does not accept telemetry or mode configuration.
 
 ## Discovery behavior and current host differences
@@ -169,7 +210,7 @@ Boundaries and limitations:
 ```ts
 import {
   CodexDiscoveryAdapter,
-  MockRouterProvider,
+  JevRouterProvider,
   route,
 } from "skilldispatch";
 import { homedir } from "node:os";
@@ -178,7 +219,7 @@ const cwd = process.cwd();
 const catalog = await new CodexDiscoveryAdapter().discover({ cwd, home: homedir() });
 const result = await route(
   { prompt: "Build a React form", cwd, agent: "codex", skills: catalog.skills },
-  new MockRouterProvider(),
+  new JevRouterProvider({ apiKey: process.env.TYPESAFE_API_KEY }),
   { threshold: 0.75, maxSkills: 4 },
 );
 console.log(result.selected);
@@ -188,7 +229,7 @@ console.log(result.selected);
 src/
   core/         Domain types, pure policy, fail-open route execution
   discovery/    Parser, safe traversal, Codex and Claude adapters
-  providers/    Metadata-only RouterProvider interface and deterministic mock
+  providers/    RouterProvider contract, deterministic mock and Jev SDK boundary
   config/       YAML validation and layered loading
   cli/          Composition root and discover/route commands
 tests/
@@ -217,7 +258,7 @@ route timeouts still return no recommendations. Providers must honor the abort
 signal and return a valid partial result before that deadline to retain successes.
 See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
-## Development and PR2
+## Development
 
 ```sh
 pnpm test
@@ -227,9 +268,7 @@ pnpm build
 ```
 
 Tests use temporary homes/repositories and fixtures instead of the developer's
-personal skills. No model or network is used. Format with `pnpm format`.
-
-PR2 should add the official Jev SDK behind `RouterProvider`, independent binary
-judgments, bounded chunk/concurrency handling, probability mapping, and mocked
-SDK tests for failures and timeouts. Verify the then-current SDK/API before
-implementation. Hooks, telemetry, eval execution and Studio remain later work.
+personal skills. No external API is used: SDK tests use fake fetch or loopback
+HTTP in child processes. Format with `pnpm format`. See
+[PR2 validation](docs/PR2_VALIDATION.md) for runtime and package checks.
+Hooks, telemetry, eval execution and Studio remain later work.
