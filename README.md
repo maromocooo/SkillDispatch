@@ -6,8 +6,8 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR4 development preview: discovery, routing, evaluation, and silent
-shadow hooks with private local JSONL traces. Real Jev routing quality has not been
+**Status:** PR5 development preview: discovery, routing, evaluation, and silent
+shadow hooks with private local JSONL traces and local trace inspection. Real Jev routing quality has not been
 established. Advisory injection, `doctor`, and Agent Skill Studio are not implemented.
 
 ## Install from source
@@ -58,6 +58,10 @@ skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
 # Host command hooks supply their UserPromptSubmit JSON on stdin.
 skilldispatch hook codex
 skilldispatch hook claude
+
+skilldispatch traces summary --agent codex --since 7d
+skilldispatch traces list --limit 20 --outcome partial
+skilldispatch traces show <trace-id> --json
 ```
 
 From a source checkout, replace `skilldispatch` with `pnpm skilldispatch` or
@@ -572,3 +576,24 @@ HTTP in child processes. Format with `pnpm format`. See
 [PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
 Advisory/enforce modes, invocation detection, Studio and cloud trace services remain later work.
+
+## Local trace inspection
+
+`traces summary`, `traces list`, and `traces show <trace-id>` read the shadow
+hook trace destination, with `--json` available on each. They use the hook config
+trust policy: user settings only, unless the user opts into project config. They
+never write events or display raw prompts, prompt hashes, session keys or prompt
+keys, even when raw prompt storage was explicitly enabled.
+
+Summary reports valid/invalid lines, matching traces, agents, providers, outcomes,
+average recommendations, P50/P95 route latency and distinct catalog fingerprints.
+Skill versions use name + agent + scope + contentHash; seen/selected counts are
+per trace, merging equal versions within a trace. “Never selected” means a version
+observed in decisions but never selected in this dataset, not an undiscovered or
+unobserved skill. “Selected” always means a SkillDispatch recommendation.
+
+List keeps the newest 20 records by timestamp (UUID tie-break), with `--limit`
+1–1000, `--agent` and `--outcome` filters. Summary and list accept `--since 1h`,
+`24h`, `7d`, etc. Time windows include both endpoints and exclude future timestamps;
+without `--since`, future records are included. Show requires a full UUID and exits
+1 for missing or duplicate IDs. Corrupt lines are counted and skipped.

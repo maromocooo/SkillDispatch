@@ -5,6 +5,7 @@ import { discoverCommand } from "./commands/discover.js";
 import { evalCommand } from "./commands/eval.js";
 import { hookCommand } from "./commands/hook.js";
 import { routeCommand } from "./commands/route.js";
+import { tracesCommand } from "./commands/traces.js";
 import type { CliEnvironment } from "./context.js";
 import type { CliIO } from "./output.js";
 
@@ -84,5 +85,50 @@ export function createProgram(
         `Shadow route ${host} skills and append a private local trace`,
       )
       .action(() => hookCommand(host, environment, stdin));
+  const traces = program
+    .command("traces")
+    .description(
+      "Inspect local shadow recommendations without exposing prompts",
+    );
+  for (const name of ["summary", "list"] as const) {
+    const command = traces
+      .command(name)
+      .description(
+        name === "summary"
+          ? "Summarize trace health and recommendation statistics"
+          : "List the newest matching traces",
+      )
+      .option("--json", "write privacy-safe JSON")
+      .addOption(
+        new Option("--agent <agent>", "filter by host").choices([
+          "codex",
+          "claude-code",
+        ]),
+      )
+      .option(
+        "--since <duration>",
+        "filter from 1h, 24h, 7d, etc. through now",
+      );
+    if (name === "list")
+      command
+        .option("--limit <n>", "maximum results, 1–1000 (default: 20)")
+        .addOption(
+          new Option(
+            "--outcome <outcome>",
+            "filter by routing outcome",
+          ).choices(["complete", "partial", "failed"]),
+        );
+    command.action((options) =>
+      tracesCommand(name, undefined, options, environment, io),
+    );
+  }
+  traces
+    .command("show")
+    .description("Inspect one exact trace UUID; prompts remain hidden")
+    .argument("<trace-id>")
+    .option("--json", "write privacy-safe JSON")
+    .action((id, options) =>
+      tracesCommand("show", id, options, environment, io),
+    );
   return program;
 }
