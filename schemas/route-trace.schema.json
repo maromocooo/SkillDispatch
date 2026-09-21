@@ -1,113 +1,138 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://skilldispatch.dev/schemas/route-trace-v1.json",
-  "title": "SkillDispatch Route Trace",
   "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "traceId",
-    "timestamp",
-    "agent",
-    "mode",
-    "prompt",
-    "catalog",
-    "router",
-    "policy",
-    "decisions",
-    "selected"
-  ],
   "properties": {
     "schemaVersion": {
+      "type": "string",
       "const": "1.0"
     },
     "traceId": {
       "type": "string",
-      "minLength": 1
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
     },
     "timestamp": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
     },
     "agent": {
-      "enum": ["codex", "claude-code", "generic"]
+      "type": "string",
+      "enum": ["codex", "claude-code"]
     },
     "mode": {
-      "enum": ["shadow", "advisory", "enforce"]
+      "type": "string",
+      "const": "shadow"
     },
     "prompt": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["storage"],
-      "properties": {
-        "storage": {
-          "enum": ["none", "hash", "raw"]
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "storage": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": ["storage"],
+          "additionalProperties": false
         },
-        "hash": {
-          "type": "string"
+        {
+          "type": "object",
+          "properties": {
+            "storage": {
+              "type": "string",
+              "const": "hash"
+            },
+            "hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": ["storage", "hash"],
+          "additionalProperties": false
         },
-        "raw": {
-          "type": "string"
+        {
+          "type": "object",
+          "properties": {
+            "storage": {
+              "type": "string",
+              "const": "raw"
+            },
+            "raw": {
+              "type": "string"
+            }
+          },
+          "required": ["storage", "raw"],
+          "additionalProperties": false
         }
-      }
+      ]
     },
-    "context": {
+    "host": {
       "type": "object",
-      "additionalProperties": true,
       "properties": {
-        "cwd": {
-          "type": "string"
+        "event": {
+          "type": "string",
+          "const": "UserPromptSubmit"
         },
-        "sessionId": {
-          "type": "string"
+        "sessionKey": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
-        "turnId": {
-          "type": "string"
+        "turnKey": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "model": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
         }
-      }
+      },
+      "required": ["event"],
+      "additionalProperties": false
     },
     "catalog": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["fingerprint", "skillCount"],
       "properties": {
         "fingerprint": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "skillCount": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "enabledSkillCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
-      }
+      },
+      "required": ["fingerprint", "skillCount", "enabledSkillCount"],
+      "additionalProperties": false
     },
     "router": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["provider", "latencyMs"],
       "properties": {
         "provider": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
         },
         "model": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
         },
         "latencyMs": {
           "type": "number",
           "minimum": 0
-        },
-        "requestCount": {
-          "type": "integer",
-          "minimum": 0
         }
-      }
+      },
+      "required": ["provider", "latencyMs"],
+      "additionalProperties": false
     },
     "policy": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["threshold", "maxSkills"],
       "properties": {
         "threshold": {
           "type": "number",
@@ -116,25 +141,41 @@
         },
         "maxSkills": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
-      }
+      },
+      "required": ["threshold", "maxSkills"],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["complete", "partial", "failed"]
     },
     "decisions": {
       "type": "array",
       "items": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["skillId", "name", "probability", "selected"],
         "properties": {
           "skillId": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
-          "path": {
-            "type": "string"
+          "agent": {
+            "type": "string",
+            "enum": ["codex", "claude-code", "generic"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["repo", "user", "admin", "system", "unknown"]
+          },
+          "contentHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           },
           "probability": {
             "type": "number",
@@ -142,38 +183,65 @@
             "maximum": 1
           },
           "selected": {
-            "type": "boolean"
-          },
-          "reasonCode": {
-            "type": "string"
+            "type": "boolean",
+            "description": "Selected by SkillDispatch routing policy; not evidence of host invocation."
           }
-        }
-      }
-    },
-    "selected": {
-      "type": "array",
-      "items": {
-        "type": "string"
+        },
+        "required": [
+          "skillId",
+          "name",
+          "agent",
+          "scope",
+          "contentHash",
+          "probability",
+          "selected"
+        ],
+        "additionalProperties": false
       }
     },
     "diagnostics": {
       "type": "array",
       "items": {
         "type": "object",
-        "additionalProperties": true,
-        "required": ["code", "level", "message"],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,127}$"
           },
           "level": {
+            "type": "string",
             "enum": ["info", "warning", "error"]
           },
-          "message": {
-            "type": "string"
+          "skillIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
           }
-        }
+        },
+        "required": ["code", "level"],
+        "additionalProperties": false
       }
     }
-  }
+  },
+  "required": [
+    "schemaVersion",
+    "traceId",
+    "timestamp",
+    "agent",
+    "mode",
+    "prompt",
+    "host",
+    "catalog",
+    "router",
+    "policy",
+    "outcome",
+    "decisions",
+    "diagnostics"
+  ],
+  "additionalProperties": false,
+  "$id": "https://skilldispatch.dev/schemas/route-trace-v1.json",
+  "title": "SkillDispatch Route Trace v1",
+  "description": "Local shadow routing recommendations. No host invocation or output quality is inferred."
 }

@@ -358,6 +358,12 @@ See [the provider contract](docs/ARCHITECTURE.md#routerprovider) for details.
 
 ## Development
 
+The public `routeTraceSchema` defines the new shadow-only Route Trace v1 contract
+in `schemas/route-trace.schema.json`. `selected` means selected by SkillDispatch's
+policy, not observed host invocation. Trace construction projects only safe fields;
+prompt hashing uses an installation key and HMAC-SHA256. Catalog fingerprints omit
+paths and path-derived IDs while retaining semantic fields and duplicate counts.
+
 The library also exports `parseEvalYaml`, `loadEvalFile`, and `runEvaluation`.
 Evaluation resolves every expected skill against a catalog before routing any
 case, then reuses `route()` with the supplied provider and policy. Results omit
