@@ -29,6 +29,7 @@ describe("Jev configuration", () => {
     "chunkSize: 49",
     "chunkSize: 0",
     "concurrency: 0",
+    "concurrency: 9",
     "concurrency: 1.5",
     "requestTimeoutMs: 2147483648",
     "requestTimeoutMs: 0",
@@ -54,5 +55,14 @@ describe("Jev configuration", () => {
     const result = await loadConfig(ctx);
     expect(result.diagnostics[0]?.code).toBe("unknown_config_key");
     expect(JSON.stringify(result)).not.toContain("synthetic-config-secret");
+  });
+
+  it("accepts the local concurrency ceiling of 8", async () => {
+    const ctx = await workspace();
+    await write(
+      join(ctx.cwd, ".skilldispatch.yaml"),
+      "router:\n  jev:\n    concurrency: 8\n",
+    );
+    expect((await loadConfig(ctx)).config.router.jev.concurrency).toBe(8);
   });
 });

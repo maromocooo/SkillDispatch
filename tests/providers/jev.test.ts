@@ -155,7 +155,7 @@ describe("Jev independent Noul routing", () => {
     },
   );
 
-  it.each([1, 2])(
+  it.each([1, 2, 8])(
     "bounds in-flight requests to concurrency %i",
     async (concurrency) => {
       const pending: {
@@ -178,23 +178,24 @@ describe("Jev independent Noul routing", () => {
       const result = new JevRouterProvider(
         { chunkSize: 1, concurrency },
         { call },
-      ).judge(input(7));
+      ).judge(input(9));
       await tick();
       expect(pending).toHaveLength(concurrency);
-      for (let completed = 0; completed < 7; completed++) {
+      for (let completed = 0; completed < 9; completed++) {
         const item = pending.shift();
         expect(item).toBeDefined();
         item?.finish(success(item.request));
         await tick();
         expect(active).toBeLessThanOrEqual(concurrency);
       }
-      expect((await result).decisions).toHaveLength(7);
+      expect((await result).decisions).toHaveLength(9);
       expect(peak).toBe(concurrency);
     },
   );
 
   it.each([
     { concurrency: 0 },
+    { concurrency: 9 },
     { concurrency: -1 },
     { concurrency: 1.5 },
     { concurrency: Number.NaN },

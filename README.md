@@ -111,7 +111,9 @@ Jev asks one independent **Noul** per candidate, mapping `noul` directly to
 48 per request and two concurrent requests by default. `chunkSize` accepts 1–48;
 48 is a local safety ceiling, not an advertised API count limit. The current API
 publishes token limits instead (see [PR2 validation](docs/PR2_VALIDATION.md)).
-`concurrency` is a positive integer; request timeout is a positive 32-bit integer.
+`concurrency` is an integer from 1 to 8 (default 2). `MAX_JEV_CONCURRENCY = 8`
+is SkillDispatch's local burst/cost safety ceiling, not an official TypeSafe API
+limit. Request timeout is a positive 32-bit integer.
 Retries default to 0 (configurable 0–2) to avoid delaying the agent prompt path.
 `requestTimeoutMs` bounds each attempt; `timeoutMs` bounds the whole route.
 
