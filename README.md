@@ -44,3 +44,12 @@ the current native format. Invalid metadata still yields diagnostics.
 slash command would prefer the personal scope. Session visibility, managed
 settings, `skillOverrides`, plugins, synced skills and legacy commands are not
 modeled. This is a local catalog, not an assertion of host invocation behavior.
+
+The library now exports `route`, `applyPolicy` and `MockRouterProvider`. Provider
+input contains only candidate IDs, names, descriptions and scopes. Disabled
+skills never reach the provider. Policy uses an inclusive threshold (default
+0.75), descending probability, name/ID tie breaks and a four-skill cap.
+Provider failures, invalid responses and timeouts return no recommendations plus
+a diagnostic. Mock scores can be keyed by ID or name. Without fixture scores the
+mock uses simple token overlap (0.9 for a match, 0.04 otherwise); these scores are
+for plumbing tests and are not calibrated relevance probabilities.

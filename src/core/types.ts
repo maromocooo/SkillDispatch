@@ -23,3 +23,34 @@ export interface Diagnostic {
   path?: string;
   skillIds?: string[];
 }
+
+export interface RouteRequest {
+  prompt: string;
+  cwd: string;
+  agent: AgentKind;
+  skills: readonly SkillDescriptor[];
+}
+
+export interface RoutingPolicy {
+  threshold: number;
+  maxSkills: number;
+}
+
+export interface ScoredSkill {
+  skillId: string;
+  name: string;
+  probability: number;
+  reasonCode?: string;
+}
+
+export interface SkillDecision extends ScoredSkill {
+  selected: boolean;
+}
+
+export interface RouteResult {
+  selected: SkillDecision[];
+  allDecisions: SkillDecision[];
+  router: { provider: string; model?: string; latencyMs: number };
+  policy: RoutingPolicy;
+  diagnostics: Diagnostic[];
+}
