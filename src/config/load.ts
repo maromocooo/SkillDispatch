@@ -21,8 +21,9 @@ export async function loadConfig(options: {
   for (const [index, path] of paths.entries()) {
     let source: string;
     try {
-      if ((await stat(path)).size > 1_048_576)
-        throw new Error("File too large");
+      const info = await stat(path);
+      if (!info.isFile() || info.size > 1_048_576)
+        throw new Error("Not a supported regular file");
       source = await readFile(path, "utf8");
     } catch (error) {
       if (index < 2 && isMissing(error)) continue;

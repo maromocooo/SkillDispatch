@@ -5,6 +5,7 @@ import { scanSources } from "./scan.js";
 import type {
   DiscoveryAdapter,
   DiscoveryContext,
+  DiscoveryMetadata,
   DiscoverySource,
 } from "./types.js";
 
@@ -54,7 +55,8 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
         skill.description = `${skill.description} ${whenToUse.replace(/\s+/gu, " ").trim()}`;
       }
       // Retain the command-name distinction: frontmatter name is only a display label.
-      skill.metadata.commandName = basename(dirname(skill.path));
+      const discovery = skill.metadata.discovery as DiscoveryMetadata;
+      skill.metadata.commandName = basename(dirname(discovery.path));
     }
     return finalizeCatalog([result]);
   }

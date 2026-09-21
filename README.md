@@ -145,11 +145,12 @@ Boundaries and limitations:
 - Symlink targets are canonicalized. Repeated canonical files load once per
   agent. Distinct same-name paths are retained even when a host would shadow one.
   `metadata.discovery` records the source and its scan order, not a universal
-  native invocation precedence.
+  native invocation precedence. Claude command names retain the local symlink
+  entry name while descriptor paths use the canonical target.
 - Codex recursively scans skill roots; Claude scans direct skill directories.
   Traversal stops at a skill boundary, skips hidden child directories and
   `node_modules`, and is bounded to depth 32 / 10,000 directories. Files are
-  limited to 1 MiB. Invalid files and traversal failures become diagnostics.
+  limited to regular files of at most 1 MiB. Invalid files and traversal failures become diagnostics.
 - Codex system roots are explicit library options because installation paths
   vary. Plugin caches and old repository `.codex/skills` are not guessed.
 - PR1 does not reproduce session state, repository trust, managed restrictions,

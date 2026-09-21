@@ -1,9 +1,21 @@
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/load.js";
 import { workspace, write } from "../helpers.js";
 
 describe("SkillDispatch configuration", () => {
+  it("rejects config directories and oversized files", async () => {
+    const ctx = await workspace();
+    await mkdir(join(ctx.cwd, "directory.yaml"));
+    await write(join(ctx.cwd, "large.yaml"), "x".repeat(1_048_577));
+    await expect(
+      loadConfig({ ...ctx, configPath: "directory.yaml" }),
+    ).rejects.toThrow("Cannot read");
+    await expect(
+      loadConfig({ ...ctx, configPath: "large.yaml" }),
+    ).rejects.toThrow("Cannot read");
+  });
   it("uses defaults without creating files", async () => {
     const ctx = await workspace();
     const { config, diagnostics } = await loadConfig(ctx);

@@ -7,6 +7,23 @@ import { CodexDiscoveryAdapter } from "../../src/discovery/codex.js";
 import { skillText, workspace, write } from "../helpers.js";
 
 describe("Claude Code discovery", () => {
+  it("keeps a symlink's local command name while canonicalizing its identity", async () => {
+    const ctx = await workspace();
+    const target = join(ctx.root, "external-implementation");
+    await write(
+      join(target, "SKILL.md"),
+      "---\ndescription: A linked skill.\n---\n",
+    );
+    await symlink(target, join(ctx.repo, ".claude/skills/local-command"));
+    const result = await new ClaudeDiscoveryAdapter().discover(ctx);
+    expect(result.skills.find((s) => s.name === "local-command")).toMatchObject(
+      {
+        path: join(target, "SKILL.md"),
+        directory: target,
+        metadata: { commandName: "local-command" },
+      },
+    );
+  });
   it("reads personal, project and CWD skills, retaining duplicate names", async () => {
     const ctx = await workspace();
     const adapter = new ClaudeDiscoveryAdapter();

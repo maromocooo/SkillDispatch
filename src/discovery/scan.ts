@@ -74,7 +74,11 @@ export async function scanSources(
                 scope: source.scope,
               });
               for (const skill of parsed.skills)
-                skill.metadata.discovery = { source: source.path, sourceIndex };
+                skill.metadata.discovery = {
+                  source: source.path,
+                  sourceIndex,
+                  path: join(path, "SKILL.md"),
+                };
               result.skills.push(...parsed.skills);
               result.diagnostics.push(...parsed.diagnostics);
             }

@@ -7,6 +7,19 @@ import { skillText, workspace, write } from "../helpers.js";
 const adapter = () => new CodexDiscoveryAdapter({ adminRoots: [] });
 
 describe("Codex discovery", () => {
+  it("diagnoses oversized and non-file SKILL.md entries without losing healthy skills", async () => {
+    const ctx = await workspace();
+    const root = join(ctx.repo, ".agents/skills");
+    await write(join(root, "large/SKILL.md"), "x".repeat(1_048_577));
+    await mkdir(join(root, "directory/SKILL.md"), { recursive: true });
+    const result = await adapter().discover(ctx);
+    expect(
+      result.diagnostics.filter((d) => d.code === "read_failed"),
+    ).toHaveLength(2);
+    expect(
+      result.skills.find((s) => s.name === "react-patterns")?.enabled,
+    ).toBe(true);
+  });
   it("finds CWD, ancestor and user scopes, keeps duplicates and isolates invalid YAML", async () => {
     const ctx = await workspace();
     const result = await adapter().discover(ctx);

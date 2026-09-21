@@ -26,3 +26,10 @@ export interface DiscoverySource {
   path: string;
   scope: SkillScope;
 }
+
+export interface DiscoveryMetadata {
+  source: string;
+  sourceIndex: number;
+  /** Original directory entry before resolving the SKILL.md target. */
+  path: string;
+}

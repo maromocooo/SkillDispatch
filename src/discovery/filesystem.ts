@@ -11,14 +11,16 @@ export async function readOptional(
   diagnostics: Diagnostic[],
 ): Promise<string | undefined> {
   try {
-    if ((await stat(path)).size > 1_048_576) throw new Error("File too large");
+    const info = await stat(path);
+    if (!info.isFile() || info.size > 1_048_576)
+      throw new Error("Not a supported regular file");
     return await readFile(path, "utf8");
   } catch (error) {
     if (!isMissing(error))
       diagnostics.push({
         code: "read_failed",
         level: "warning",
-        message: "Cannot read file (maximum size: 1 MiB).",
+        message: "Cannot read regular file (maximum size: 1 MiB).",
         path,
       });
     return undefined;
