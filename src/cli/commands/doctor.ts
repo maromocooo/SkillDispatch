@@ -8,7 +8,7 @@ export async function doctorCommand(
   environment: CliEnvironment,
   io: CliIO,
 ): Promise<void> {
-  const result = await runDoctor(environment);
+  const result = await runDoctor(environment, environment.execution);
   if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
   else {
     for (const check of result.checks)
@@ -17,7 +17,7 @@ export async function doctorCommand(
       );
     io.stdout(
       result.usable
-        ? "Offline checks completed; warnings may need attention.\n"
+        ? "Installation usable; warnings may need attention. Routing readiness is reported separately above.\n"
         : "Configuration or installation problems require attention.\n",
     );
   }

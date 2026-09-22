@@ -6,6 +6,9 @@ import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
 import { CodexDiscoveryAdapter } from "../discovery/codex.js";
 import { isMissing } from "../discovery/filesystem.js";
 import { validateApiKey } from "../providers/jev/options.js";
+import { resolveExecution } from "../registration/command.js";
+import { inspectRegistration } from "../registration/inspect.js";
+import { type CliExecution, hosts } from "../registration/types.js";
 import type { RuntimeEnvironment } from "../runtime/context.js";
 import {
   assertTraceDestination,
@@ -53,6 +56,7 @@ async function directoryHealth(path: string): Promise<boolean> {
 
 export async function runDoctor(
   environment: RuntimeEnvironment,
+  execution?: CliExecution,
 ): Promise<DoctorResult> {
   const checks: DoctorCheck[] = [];
   const add = (
@@ -88,8 +92,27 @@ export async function runDoctor(
   add(
     "hook_commands",
     "PASS",
-    "Commands available: skilldispatch hook codex; skilldispatch hook claude. Host registration is not checked.",
+    "Commands available: skilldispatch hook codex; skilldispatch hook claude. User registration is inspected read-only; host trust/lifecycle is not verified.",
   );
+  let resolved: CliExecution | undefined;
+  if (execution) {
+    try {
+      resolved = await resolveExecution(execution);
+    } catch {
+      /* Report unavailable identity below. */
+    }
+  }
+  for (const host of hosts) {
+    const registration = await inspectRegistration(host, environment, resolved);
+    add(
+      `hook_${host}`,
+      registration.registration === "installed" && !registration.issues.length
+        ? "PASS"
+        : "WARN",
+      `${host} shadow hook: ${registration.registration}${registration.execution ? ` (${registration.execution})` : ""}. User layer only.${registration.issues.length ? ` Issues: ${registration.issues.join(", ")}.` : ""}`,
+      registration.registration,
+    );
+  }
   let loaded: Awaited<ReturnType<typeof loadConfig>>;
   try {
     loaded = await loadConfig({ ...environment, mode: "hook" });
@@ -98,6 +121,12 @@ export async function runDoctor(
       "config",
       "FAIL",
       "Cannot load trusted configuration. Check user settings and any explicitly trusted project settings.",
+    );
+    add(
+      "routing_ready",
+      "WARN",
+      "Routing prerequisites could not be checked because configuration is invalid.",
+      false,
     );
     return result();
   }
@@ -131,6 +160,7 @@ export async function runDoctor(
     config.router.provider,
   );
   const apiKey = environment.env.TYPESAFE_API_KEY;
+  let providerReady = config.router.provider === "mock";
   if (config.router.provider === "mock")
     add(
       "api_key",
@@ -146,6 +176,7 @@ export async function runDoctor(
   else {
     try {
       validateApiKey(apiKey);
+      providerReady = true;
       add(
         "api_key",
         "PASS",
@@ -159,6 +190,13 @@ export async function runDoctor(
       );
     }
   }
+  const routingReady = providerReady && config.telemetry.enabled;
+  add(
+    "routing_ready",
+    routingReady ? "PASS" : "WARN",
+    "Local shadow routing prerequisites only; does not verify online authentication, host registration/trust or delivery.",
+    routingReady,
+  );
   for (const adapter of [
     new CodexDiscoveryAdapter(),
     new ClaudeDiscoveryAdapter(),

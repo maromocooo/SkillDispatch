@@ -35,7 +35,7 @@ describe("offline installation doctor", () => {
     );
     expect(
       result.checks.find((c) => c.code === "hook_commands")?.detail,
-    ).toContain("registration is not checked");
+    ).toContain("registration is inspected read-only");
     expect(await readdir(ctx.root)).toEqual(before);
   });
   it("validates private key/trace, only counts lines and never calls the API", async () => {
