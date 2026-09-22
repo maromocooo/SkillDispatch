@@ -99,7 +99,12 @@ It works from the checkout and installed package without a key or real-home read
   consumer installation reported `ERR_PNPM_NO_OFFLINE_META`. Frozen root installation
   does not seed every registry metadata cache entry. Workflows now allow npm
   registry access for the temporary package install, with all application smoke
-  still using isolated mock fixtures. Final remote CI results are recorded below.
+  still using isolated mock fixtures.
+- [GitHub Actions CI run 35723584600](https://github.com/maromocooo/SkillDispatch/actions/runs/35723584600)
+  passed both Ubuntu Node 20 and Node 24 jobs on `c59f72d`, including all 874 tests,
+  typecheck/lint/build, 100-case mock benchmark, pack, consumer installation, every
+  package smoke and artifact upload. This evidence update changes documentation
+  only; the final pushed revision is also checked in CI before handoff.
 
 ## Validation results
 
