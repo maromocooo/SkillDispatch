@@ -37,8 +37,8 @@ discovery:
 Jev asks one independent **Noul** per candidate, mapping `noul` directly to
 `probability` (never Choice confidence). Candidates sort by stable ID, with up to
 48 per request and two concurrent requests by default. `chunkSize` accepts 1–48;
-48 is a local safety ceiling, not an advertised API count limit. The current API
-publishes token limits instead (see [PR2 validation](PR2_VALIDATION.md)).
+48 is a local safety ceiling, not an advertised API count limit. Consult the
+[TypeSafe API reference](https://docs.typesafe.ai/api) for upstream request limits.
 `concurrency` is an integer from 1 to 8 (default 2). `MAX_JEV_CONCURRENCY = 8`
 is SkillDispatch's local burst/cost safety ceiling, not an official TypeSafe API
 limit. Request timeout is a positive 32-bit integer.
@@ -79,22 +79,24 @@ not added to requests. Descriptions include discovery-normalized fallbacks;
 anything you include in a prompt or description is therefore sent. The API key
 is used only for authentication, never in model input or diagnostics. SDK debug
 logging and environment endpoint overrides are disabled. Responses are buffered
-before SDK stream cloning to avoid the Node 20 cancellation issue; see
-[the validation notes](PR2_VALIDATION.md) for tests and limitations.
+before SDK stream cloning to keep cancellation safe on Node 20. The provider
+boundary uses the [official SDK](https://github.com/typesafe-ai/typesafe-sdk-js);
+normal tests exercise fake calls and loopback transport, not the live service.
 
 Only hook commands persist traces. `discover`, `route`, and `eval` keep their
 existing behavior and never write telemetry, even when it is enabled.
 
 ## Discovery behavior and current host differences
 
-Codex references were checked on 2026-09-21; Claude references were rechecked for PR8 on 2026-09-22:
+Discovery follows the documented sources below, with the explicit coverage limits
+in this section:
 
 - [Codex skills](https://learn.chatgpt.com/docs/build-skills): scans `.agents/skills`
   from CWD to the repository root, plus `~/.agents/skills` and `/etc/codex/skills`.
   Duplicate names remain separate. `~/.codex/config.toml` supports per-path
   disabling; `agents/openai.yaml` controls implicit invocation.
 - [Claude Code skills](https://code.claude.com/docs/en/skills): project discovery
-  also walks to the repository root. Unlike the handoff's strict parser, Claude
+  also walks to the repository root. Claude
   allows missing names (directory fallback) and descriptions (first non-empty
   body line). Personal skills take precedence over project skills for native
   command-name collisions. Nested skills may also load later during a session.
@@ -112,7 +114,7 @@ The generic/Codex parser still requires non-empty name and description. Claude
 fallbacks live in its adapter; a skill with no usable description is diagnosed
 and excluded. Claude `when_to_use` is appended to the routing description.
 
-Claude cached synced skills are now read explicitly from
+Claude cached synced skills are read explicitly from
 `<CLAUDE_CONFIG_DIR>/skills/synced/<sync-directory>/<skill>/SKILL.md`, separately
 from personal skills. Advisory uses `anthropic-skills:<skill>`; sync-directory
 names are not invocation identifiers. Duplicate names across sync directories are
@@ -149,6 +151,13 @@ skills, while an array locks skills only when it contains `"skills"`. Unknown
 surface names and non-managed copies of this policy are ignored. With skills locked,
 plugin/managed skills remain eligible; local skills remain visible but non-routable,
 and synced skills are not loaded. Manual-only restrictions still apply.
+
+See the official [plugin reference](https://code.claude.com/docs/en/plugins-reference),
+[marketplace defaults](https://code.claude.com/docs/en/plugin-marketplaces),
+[environment variables](https://code.claude.com/docs/en/env-vars),
+[managed settings](https://code.claude.com/docs/en/managed-settings), and setting-specific
+rules for [sync opt-out](https://code.claude.com/docs/en/settings-reference#syncclaudeaiskills)
+and [customization policy](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization).
 
 Inspect the expanded catalog offline:
 
@@ -258,7 +267,8 @@ empty selections can create false negatives. `provider_partial` increments
 `providerPartialCount`; successful decisions remain, missing recommendations
 affect quality normally. An all-failed partial result counts as partial, not as a
 core contract failure. Without gates these results exit 0, so also inspect the
-reliability counts. There is no separate reliability gate in PR3.
+reliability counts. Evaluation gates cover precision and recall; provider
+reliability is reported separately.
 
 Results contain case IDs, skill references/probabilities, FP/FN lists, metrics,
 provider/model, latency and diagnostic codes; **no raw prompts, diagnostic message
@@ -274,6 +284,59 @@ example dataset illustrates explicit/implicit/multiple/no-skill, overlapping,
 negated, Japanese and mixed-language requests; tailor labels and broad/specific
 skill pairs to your catalog. No automatic threshold tuning or reranking is added.
 
+
+## Hook registration and modes
+
+```sh
+skilldispatch hooks status
+skilldispatch hooks install claude --dry-run
+skilldispatch hooks install claude
+skilldispatch hooks install codex
+skilldispatch doctor
+```
+
+Installation edits only user `~/.claude/settings.json` or `~/.codex/hooks.json`.
+It resolves an absolute Node executable/CLI entrypoint with platform-safe quoting,
+so host PATH need not match the interactive shell. Repeated installation reconciles
+owned registrations without duplicates. Unrelated hooks/settings are preserved.
+`--dry-run` creates no files, directories or backups.
+
+Shadow is the default for both agents. Claude installation also registers the
+PreToolUse/PostToolUse/PostToolUseFailure `Skill` observers asynchronously. To enable
+Claude advisory, merge this into `~/.config/skilldispatch/config.yaml`, then reinstall
+Claude's registration and reload the host:
+
+```yaml
+hook:
+  modes:
+    claude: advisory
+    codex: shadow
+```
+
+Advisory uses a synchronous UserPromptSubmit handler. A config change alone does
+not edit host settings: status/doctor report a mismatch until install reconciles
+it. Switching Claude to shadow and reinstalling restores async execution.
+`--sync` is available for Claude shadow debugging; Codex remains async-only and
+rejects that option. Observer hooks stay async in either mode.
+
+Advisory requires complete routing and safe native skill identifiers. It injects
+only a bounded recommendation, not skill content. Empty, partial, failed or unsafe
+results add no context. The user request and host permissions remain authoritative.
+
+Existing settings receive a first private `.skilldispatch.bak` backup which is
+never overwritten. Mutations use a same-directory temporary file and atomic rename,
+retain permissions and refuse unsafe links, malformed input or modified/ambiguous
+registrations. Custom host directories require manual setup. Host trust/reload is
+not inferred from registration success; review Codex hooks when requested.
+
+```sh
+skilldispatch hooks uninstall claude --dry-run
+skilldispatch hooks uninstall claude
+skilldispatch hooks uninstall codex
+```
+
+Uninstall removes only owned routing/observer handlers. It does not restore a whole
+backup or delete runtime data. Remove registrations before uninstalling the package.
 
 ### Manual alternative and Codex inline conflict
 
@@ -401,9 +464,8 @@ different promptKeys even for identical text. Hosts are domain-separated; legacy
 Claude inputs without `prompt_id` omit promptKey rather than inventing an ID.
 `host.sessionKey` is a separate HMAC of the session. Raw host IDs are never stored.
 
-The pre-release v1 schema replaces `turnKey` with `promptKey`; schemaVersion stays
-`1.0`; this change was made before the first v1 release and before PR4 merged. Old development traces
-using turnKey do not validate against the revised schema.
+Route Trace v1 uses `host.promptKey` for submission correlation. This field is
+optional because not every host input supplies a prompt submission identifier.
 
 New directories/files use 0700/0600 on POSIX.
 Key creation is race-safe; an existing key is never replaced automatically.
@@ -441,9 +503,9 @@ SkillDispatch does not inspect transcripts, images, session files or missing
 Claude content to compensate. Empty/whitespace-only text is a safe no-op.
 
 Codex stays shadow-only. Its context placement/salience concern is tracked in
-[upstream #40680](https://github.com/openai/codex/issues/40680); PR7 adds no Codex
-workaround, context injection or subagent routing. Claude advisory is separately
-opt-in and does not claim native invocation or improved routing accuracy.
+[upstream #40680](https://github.com/openai/codex/issues/40680). Codex has no context
+injection in v0.1.0. Claude advisory is separately opt-in; delivery alone does not
+prove native invocation or improved routing accuracy.
 
 ## Library and architecture
 
@@ -474,8 +536,11 @@ src/
   eval/         YAML schema, selector resolution, metrics and sequential runner
   runtime/      Config/discovery/provider composition shared by CLI and hooks
   hooks/        Bounded stdin, shared mode-aware runtime and safe Claude advisory
-  telemetry/    Trace v1 projection, HMAC, catalog fingerprint and JSONL sink
-  cli/          discover/route/eval/hook commands
+  telemetry/    Trace projection, HMAC, fingerprint, safe JSONL and analytics
+  observability/ Claude Skill observer, lifecycle correlation and observed adoption
+  registration/ User-scope hook inspection, planning and atomic updates
+  ops/          Offline readiness and storage health checks
+  cli/          Commands and privacy-safe output views
 tests/
   fixtures/     Valid/invalid skills, scope layouts and score fixtures
   discovery/    Parser, scopes, duplicates, symlinks, disabled skills
@@ -584,8 +649,8 @@ frequency maps for latencies and skill versions plus distinct catalog fingerprin
 not trace bodies; memory therefore grows with unique values. List retains at most
 its requested limit; show retains one redacted detail view. All commands scan the
 file, with no index, rotation, repair or deletion. These statistics describe router
-behavior, not skill usefulness. The separate PR9 funnel reports observed model
-Skill calls only when correlation and observer availability permit it.
+behavior, not skill usefulness. Invocation analytics reports positive evidence
+from Claude Skill observers when exact correlation is available.
 
 To repeat the installed package check offline after packing/installing in a
 temporary directory:
@@ -595,12 +660,13 @@ node scripts/trace-ops-smoke.mjs /path/to/install/node_modules/.bin/skilldispatc
 ```
 
 This explicit development script uses temporary settings and denies fetch; it is
-not run by normal tests, CI or prepack. No online doctor or raw-prompt display
-option exists. Claude advisory is supported through explicit user opt-in.
+also run by the isolated package smoke in CI; it does not run during ordinary
+unit tests or prepack. No online doctor or raw-prompt display option exists. Claude
+advisory is supported through explicit user opt-in.
 
 ## Claude model Skill invocation telemetry
 
-Claude native Skill observer (PR9): `skilldispatch hook claude-skill` accepts
+The Claude native Skill observer, `skilldispatch hook claude-skill`, accepts
 `PreToolUse`, `PostToolUse`, or `PostToolUseFailure` JSON for `tool_name: "Skill"`
 on stdin. It is local-only, silent, and fail-open. Events go to the private
 `invocations.jsonl` in the SkillDispatch data directory, separately from routing
@@ -614,7 +680,7 @@ three `Skill` observers together. Observers always use `async: true`; advisory
 Observer persistence uses user configuration only, even if project routing
 configuration was explicitly trusted. It never invokes Jev.
 
-`skilldispatch traces summary` now reports an advisory funnel; `traces show <id>`
+`skilldispatch traces summary` reports observed adoption counts; `traces show <id>`
 shows same-prompt model Skill lifecycles. **Recommended ≠ injected ≠ observed
 model-invoked ≠ observed succeeded**. Observed success means the native Skill tool
 completed, not that Claude
@@ -629,7 +695,7 @@ terminal event has an **unknown** outcome, not failure. This telemetry provides
 positive evidence of adoption, not complete negative observation. Exact
 injection-to-invocation conversion and invocation success percentages are
 intentionally not reported; they require a future per-turn observation-completeness
-mechanism. No completeness witness is implemented in PR9.
+mechanism. No completeness witness is implemented.
 
 Old traces without the capability marker are **telemetry unavailable**, outside
 these adoption counts rather than negative examples. Subagent-marked events remain
@@ -637,16 +703,15 @@ visible separately and do not count as main-turn adoption. Direct user `/skillna
 invocation remains outside model-adoption metrics. No transcript parsing or online
 calls are used to fill gaps.
 
-After updating an existing installation:
+After installing or updating SkillDispatch:
 
 ```sh
-pnpm build
-pnpm skilldispatch hooks install claude
-pnpm skilldispatch hooks status claude
-pnpm skilldispatch doctor
+skilldispatch hooks install claude
+skilldispatch hooks status claude
+skilldispatch doctor
 # Reload/restart Claude Code, then use it normally.
-pnpm skilldispatch traces summary --since 24h
-pnpm skilldispatch traces show <route-trace-id>
+skilldispatch traces summary --since 24h
+skilldispatch traces show <route-trace-id>
 ```
 
 `capabilities.skillInvocationTelemetry: true` means observer registration and local
@@ -687,8 +752,8 @@ Summary JSON's `advisoryFunnel` reports facts, with no conversion-rate fields:
 `traces show` labels **Model skill invocations observed** and distinguishes
 `observerConfigured`, `streamReadable` and `correlationAvailable` in JSON. None of
 these confirms delivery or completeness. An empty `calls` array means no matching
-lifecycle was observed, not that Claude did nothing. The pre-merge PR9 fields
-`injectedToModelInvoked` and `modelInvokedToSucceeded` have been removed.
+lifecycle was observed, not that Claude did nothing. JSON contains observed counts
+without exact conversion-rate fields.
 
 Invocation stream health counts cover the full stream, while `--since` / `--agent`
 filter routing cohorts and their funnel. Invalid lines are counted and skipped;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Local safety ceiling, not a claimed API question-count limit. See PR2_VALIDATION.
+// Local batch-size safety ceiling, not an upstream API question-count limit.
 export const MAX_JEV_CHUNK_SIZE = 48;
 // SkillDispatch burst/cost guard, not an official TypeSafe API limit.
 export const MAX_JEV_CONCURRENCY = 8;
