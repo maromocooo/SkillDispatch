@@ -1,10 +1,11 @@
 import type { Readable } from "node:stream";
-import { Command, Option } from "commander";
+import { Argument, Command, Option } from "commander";
 import { VERSION } from "../version.js";
 import { discoverCommand } from "./commands/discover.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { evalCommand } from "./commands/eval.js";
 import { hookCommand } from "./commands/hook.js";
+import { hooksMutation, hooksStatus } from "./commands/hooks.js";
 import { routeCommand } from "./commands/route.js";
 import { tracesCommand } from "./commands/traces.js";
 import type { CliEnvironment } from "./context.js";
@@ -93,6 +94,33 @@ export function createProgram(
     )
     .option("--json", "write privacy-safe JSON")
     .action((options) => doctorCommand(options, environment, io));
+  const registrations = program
+    .command("hooks")
+    .description(
+      "Inspect/install/remove user-scope shadow hook registrations offline",
+    );
+  registrations
+    .command("status")
+    .addArgument(new Argument("[host]").choices(["codex", "claude"]))
+    .option("--json", "write safe registration status JSON")
+    .action((host, options) => hooksStatus(host, options, environment, io));
+  for (const action of ["install", "uninstall"] as const) {
+    const command = registrations
+      .command(action)
+      .addArgument(new Argument("<host>").choices(["codex", "claude"]))
+      .option(
+        "--dry-run",
+        "show proposed action without writing files, directories or backups",
+      );
+    if (action === "install")
+      command.option(
+        "--sync",
+        "wait synchronously in the host (default: async shadow)",
+      );
+    command.action((host, options) =>
+      hooksMutation(host, action, options, environment, io),
+    );
+  }
   const traces = program
     .command("traces")
     .description(

@@ -6,7 +6,7 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR5 development preview: discovery, routing, evaluation, and silent
+**Status:** PR6 development preview: discovery, routing, evaluation, and silent
 shadow hooks with private local JSONL traces and local trace inspection. Real Jev routing quality has not been
 established. Advisory injection and Agent Skill Studio are not implemented.
 

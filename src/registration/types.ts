@@ -25,7 +25,7 @@ export interface HookStatus {
 export class RegistrationError extends Error {
   constructor(readonly code: string) {
     super(
-      `Hook registration unavailable (${code}). No unrelated settings were changed.`,
+      `Hook registration unavailable (${code}). ${code === "codex_inline_hooks_manual_action_required" ? "Inline hooks exist in ~/.codex/config.toml. Keep one user hook source; edit the inline registration manually or migrate it yourself before installing hooks.json." : "Inspect the user hook configuration before retrying."}`,
     );
   }
 }

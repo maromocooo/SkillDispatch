@@ -4,6 +4,7 @@ import {
   maxSkillsSchema,
   probabilitySchema,
 } from "../config/schema.js";
+import type { CliExecution } from "../registration/types.js";
 import {
   createProvider,
   loadRuntimeContext,
@@ -19,7 +20,7 @@ export interface CliOptions {
   maxSkills?: string;
 }
 
-export type CliEnvironment = RuntimeEnvironment;
+export type CliEnvironment = RuntimeEnvironment & { execution?: CliExecution };
 
 /** The CLI is the composition root; domain code never chooses an agent/provider. */
 export async function discoverForCommand(

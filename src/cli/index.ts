@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { CommanderError } from "commander";
 import { terminalText } from "./output.js";
 import { createProgram } from "./program.js";
@@ -17,6 +18,11 @@ try {
   const program = createProgram(
     {
       cwd: process.cwd(),
+      execution: {
+        nodePath: process.execPath,
+        cliPath: fileURLToPath(import.meta.url),
+        platform: process.platform,
+      },
       home: homedir(),
       env: {
         CODEX_HOME: process.env.CODEX_HOME,
