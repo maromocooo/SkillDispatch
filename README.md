@@ -10,8 +10,7 @@ more skills, and connects host-native delivery with local observation. It suppor
 Claude Code and Codex through agent adapters; Claude also supports advisory and
 native Skill tool observers. **Recommended does not mean invoked.**
 
-**v0.1.0 release candidate — npm publication is pending.** Use the source/tarball
-installation below until the first release. Node.js 20+; MIT licensed.
+Node.js 20+; MIT licensed.
 
 Try the [offline demo](#offline-demo) without an API key, or follow the
 [Quick Start](#quick-start) to register shadow hooks. Jev is the first real routing
@@ -57,8 +56,13 @@ for routing to supply a recommendation to the current turn. No skill body is inj
 
 ## Quick Start
 
-**Available now: install the release candidate from source.** Install Node.js 20+
-and pnpm 10.17.1 first, then:
+Install Node.js 20+, then use npm to install version 0.1.0:
+
+```sh
+npm install --global skilldispatch@0.1.0
+```
+
+To build and install from source instead, install pnpm 10.17.1 and run:
 
 ```sh
 git clone https://github.com/maromocooo/SkillDispatch.git
@@ -67,12 +71,6 @@ pnpm install --frozen-lockfile
 pnpm build
 pnpm pack
 npm install --global ./skilldispatch-0.1.0.tgz
-```
-
-After npm publication, the equivalent installation will be:
-
-```sh
-npm install --global skilldispatch
 ```
 
 For real routing, obtain a TypeSafe API key and make it available to the shell that

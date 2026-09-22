@@ -5,11 +5,10 @@
 Do not post API keys, npm/GitHub tokens, raw prompts, full host settings, transcripts,
 company data, or unredacted traces in a public issue.
 
-Use GitHub's **Security → Report a vulnerability** for this repository when enabled:
+Use GitHub's **Security → Report a vulnerability** for this repository:
 https://github.com/maromocooo/SkillDispatch/security/advisories/new
 
-Maintainers must enable private vulnerability reporting before publication.
-If the button is absent,
+If private reporting is unavailable,
 open a public issue containing only “Please enable private vulnerability reporting”
 and wait for a private channel; do not include exploit details or sensitive data.
 No security inbox or response-time guarantee is claimed.
@@ -21,9 +20,10 @@ are security-relevant. Replace all real identifiers with placeholders.
 
 ## Supported versions
 
-The latest 0.1.x release is the intended supported line after publication. The
-current 0.1.0 candidate is not yet published. Earlier development snapshots should
-upgrade rather than expect backports. There is no paid support or patch SLA.
+Security fixes target the latest published release in the 0.1.x line. Earlier
+patch versions and development snapshots are not maintained separately; upgrade
+to the latest 0.1.x release rather than expect backports. There is no paid support
+or patch SLA.
 
 ## Scope
 

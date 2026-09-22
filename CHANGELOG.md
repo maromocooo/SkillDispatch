@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — release candidate (unreleased)
+## 0.1.0
 
 - Discover Codex and Claude Code local/project skills; include Claude synced,
   enabled installed plugin and documented file-managed sources.
