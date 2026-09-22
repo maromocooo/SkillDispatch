@@ -1,11 +1,14 @@
-# v0.1.0 release checklist
+# Release checklist
 
 Nothing in this checklist authorizes an agent to publish, tag, change visibility or
-post launch material. The release candidate PR prepares artifacts for a maintainer.
+post launch material. Use it for each reviewed release candidate.
 
 ## Review the candidate
 
-- [ ] Merge reviewed PR10 normally; check a clean main and reviewed commit SHA.
+The commands below use 0.1.0 as an example; substitute the reviewed package version
+and keep workflow artifact names in sync.
+
+- [ ] Merge the reviewed release candidate; check a clean main and reviewed commit SHA.
 - [ ] `pnpm install --frozen-lockfile`; tests, typecheck, lint, build on Node 20 and 24.
 - [ ] GitHub CI green on the exact release commit (not merely local equivalents).
 - [ ] `pnpm pack --pack-destination artifacts` and
@@ -16,18 +19,19 @@ post launch material. The release candidate PR prepares artifacts for a maintain
 - [ ] Review README links, source/npm quick start, public API, schemas, MIT license,
   dependency license files, SECURITY, contributing guide and changelog.
 - [ ] Verify `package.json`, `src/version.ts`, workflows and artifact names agree.
-  The candidate is 0.1.0, replacing unpublished 0.1.0-dev.1; no version/tag published.
+  Use a version not already published; never replace an existing release tag.
 - [ ] Recheck `npm view skilldispatch name versions --json`. Registry 404 means no
   package metadata was found, not a reservation or guarantee of ownership.
   If unavailable, agree a scoped name before modifying install instructions.
 - [ ] Review all synthetic benchmark labels by a human. Record reviewer/date before
-  claiming ground-truth accuracy. Run mock validation; live Jev is separate opt-in.
+  claiming accuracy. Draft datasets can ship when explicitly labeled as unreviewed
+  synthetic data, without quality claims. Run mock validation; live Jev is separate opt-in.
 - [ ] If committing a live result, retain model/date/SDK/policy/runtime/dataset hash
   and reliability counts; never label mock scores as measured quality.
 - [ ] Repeat secret/private path scan on tracked files and the final tarball.
 - [ ] Real Claude advisory + Skill attempted/succeeded smoke on synthetic data.
 - [ ] Real Codex shadow smoke and hook trust/reload check. Async delivery is not guaranteed.
-- [ ] Ensure private vulnerability reporting is enabled (currently disabled at review).
+- [ ] Ensure a working private vulnerability reporting channel is enabled.
 
 ## CI and publication safeguards
 
@@ -56,7 +60,7 @@ Before enabling that variable:
 - [ ] Do not create/store a long-lived `NPM_TOKEN`. Subsequent OIDC publishing uses
   short-lived workflow identity with `id-token: write`.
 
-Official references reviewed for this candidate:
+Official publishing references:
 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/),
 [npm provenance](https://docs.npmjs.com/generating-provenance-statements/),
 [GitHub private reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
@@ -66,15 +70,15 @@ provenance; the job additionally requests `--provenance`. Release builds do not
 restore dependency caches. Settings/permissions and authentication are not tested
 by merely validating workflow syntax.
 
-## Explicit maintainer release actions (not performed by PR10)
+## Explicit maintainer release actions
 
-1. Approve the checklist and final clean main; deliberately create/push `v0.1.0`.
+1. Approve the checklist and final clean main; deliberately create/push its version tag.
 2. Review successful tag validation and unpacked candidate contents.
 3. After ownership/OIDC/environment setup, enable the guarded variable and manually
    dispatch `publish.yml` from main with the reviewed tag and confirmation. Review
    the environment approval; never publish from a fork/PR.
 4. Verify installed npm package/version/provenance in a fresh environment.
 5. Deliberately publish a GitHub Release with changelog and limitations; no workflow
-   in this PR does that automatically.
+   in this repository does that automatically.
 6. Update README publication status, changelog date and optional npm badge only after
    the registry version exists. Use sanitized synthetic demo material for launch.

@@ -6,7 +6,8 @@ Core routing is independent of SDK and host wire formats. Jev receives prompt te
 and minimal candidate name/description/agent/scope, not paths, cwd, plugin account
 IDs, skill bodies or arbitrary metadata. TypeSafe handles that request under its
 own service terms; local prompt hashing does **not** anonymize the external routing
-request. The application has no trace upload, cloud analytics or account service.
+request. Route sensitive prompts only when you accept that external data boundary.
+The application has no trace upload, cloud analytics or account service.
 
 UserPromptSubmit hooks fail open under parsing, setup, provider, timeout and storage
 failure. Shadow and observers are silent. Claude advisory emits only bounded JSON

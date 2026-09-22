@@ -21,7 +21,7 @@ providers/fetch, synthetic filesystem fixtures and isolated homes. Existing SDK
 transport regression tests use loopback HTTP. Live benchmarks require a separate
 explicit `--live` command and a key; never use them as test or prepack hooks.
 
-Keep prompts, API keys, absolute user paths and company skills out of fixtures,
+Keep real user prompts, API keys, absolute user paths and company skills out of fixtures,
 logs and issues. Hooks must remain bounded and fail-open. Do not bypass project
 config trust, file ownership/link checks or sanitized diagnostics. Read
 [SECURITY](SECURITY.md) before reporting a vulnerability.
@@ -32,6 +32,19 @@ policy behavior. To add an agent, implement a discovery adapter and host wire
 adapter without importing host details into core. Verify official host contracts;
 do not infer actual invocation from routing selection. Keep public exports small.
 See [architecture](docs/ARCHITECTURE.md) for existing contracts.
+
+For release-facing changes, also run:
+
+```sh
+node scripts/public-benchmark.mjs --mock
+pnpm pack --pack-destination artifacts
+node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz
+```
+
+Package installation may download npm dependencies; application smoke uses isolated
+homes and mock providers. `--offline` works with a populated package metadata store.
+Keep public documentation links and repository hygiene checks passing. Put validation
+results in the change report rather than adding per-change validation documents.
 
 Benchmark labels are versioned reviewable data. Discuss ambiguous cases explicitly,
 do not fit labels to model outputs, and keep mock validation separate from accuracy.

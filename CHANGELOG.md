@@ -15,5 +15,6 @@
 - Provide a synthetic public benchmark draft, offline demo, package/CI/release
   checks and public onboarding documentation.
 
-No Codex advisory, direct-user slash invocation telemetry, subagent routing, Studio,
-cloud upload or automatic tuning is included. No npm release or tag exists yet.
+Known limitations: Codex is shadow-only; Claude invocation observers are best-effort
+and exclude direct user slash commands. Some live/session-only catalog sources are
+unsupported. Routing thresholds are configured explicitly, without automatic tuning.

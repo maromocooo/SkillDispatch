@@ -2,44 +2,54 @@
 
 **Observable skill routing for coding agents.**
 
-Your coding agent may have dozens of skills. SkillDispatch routes each prompt to
-zero or more relevant skills and shows what was recommended, injected, and observed
-being invoked. It is a universal routing runtime with agent adapters and replaceable
-providers; Jev is the first real provider.
+See which skills your coding agent was recommended to use, and which native
+invocations were observed.
+
+SkillDispatch discovers a model-routable catalog, routes each prompt to zero or
+more skills, and connects host-native delivery with local observation. It supports
+Claude Code and Codex through agent adapters; Claude also supports advisory and
+native Skill tool observers. **Recommended does not mean invoked.**
 
 **v0.1.0 release candidate — npm publication is pending.** Use the source/tarball
 installation below until the first release. Node.js 20+; MIT licensed.
 
-- Claude Code and Codex catalog discovery, including Claude synced/enabled plugin skills
-- Independent multi-skill Jev routing; mock provider for offline development
-- Shadow by default; Claude same-turn advisory through explicit user opt-in
-- Routing evals, offline doctor, private local JSONL traces and CLI analytics
-- Recommended → injected → **observed** model invocation → **observed** success
+Try the [offline demo](#offline-demo) without an API key, or follow the
+[Quick Start](#quick-start) to register shadow hooks. Jev is the first real routing
+provider; the provider contract and agent adapters keep the runtime extensible.
 
 ## Why SkillDispatch?
 
-As catalogs grow, broad descriptions overlap and skill selection gets harder to
-inspect. SkillDispatch separates discovery, routing policy, host delivery and
-observation so you can test descriptions and inspect behavior. It does not replace
-native skill invocation or require a dashboard, database or Studio.
+Installing a skill and observing the model use it are different things. As catalogs
+grow and descriptions overlap, selection alone leaves that gap unexplained.
+
+- **Native-catalog aware.** Reads supported local, synced and enabled-plugin state
+  and invocation eligibility. Finding a SKILL.md on disk does not automatically
+  make it routable; host delivery uses safe native identifiers.
+- **Observable end to end.** Separates recommended → injected → observed model-invoked
+  → observed succeeded. Missing async events remain unknown.
+- **Measurable.** Labeled evals test routing behavior; local traces let you inspect
+  individual decisions and aggregate observations without a dashboard.
 
 ## How it works
 
 ```mermaid
 flowchart TD
-  P[User prompt] --> H[Host hook]
-  H --> C[Agent skill catalog]
-  C --> J[Jev independent skill judgments]
-  J --> R[Threshold and max-skills policy]
-  R --> S[Shadow: no context change]
-  R --> A[Claude advisory: safe native identifiers]
-  P --> G[Coding agent]
+  P[User prompt] --> H[Host adapter]
+  H --> C[Native catalog discovery]
+  C --> R[RouterProvider + routing policy]
+  R --> N[Zero or more recommendations]
+  N --> S[Shadow: trace only]
+  N --> A[Claude advisory injection]
+  P --> G[Host agent]
   A --> G
-  R --> T[Local routing traces]
-  G --> O[Claude Skill tool observers]
-  O --> I[Local invocation events]
-  T --> V[CLI analytics]
+  G --> K[Claude native Skill invocation]
+  K --> O[Async observer events]
+  N --> T[Route traces]
+  O --> I[Invocation stream]
+  T --> V[Local analytics]
   I --> V
+  E[Labeled eval cases] --> R
+  N --> M[Eval metrics]
 ```
 
 Shadow routing and invocation observers run asynchronously. Claude advisory waits
@@ -152,8 +162,8 @@ rewriting `config.toml`; see the [manual setup alternative](docs/OPERATIONS.md#m
 
 ## Example and offline demo
 
-A maintainer-reported Claude dogfood run with the intent “prepare an issue ticket”
-observed `jira-ticket` recommended and injected, followed by attempted → succeeded:
+In a real Claude Code smoke test, a generic issue-writing request produced a
+`jira-ticket` recommendation and injection, followed by an observed attempt and success:
 
 ```text
 Recommended              1
@@ -225,8 +235,10 @@ high, and thresholds are not universally calibrated.
 
 ## Privacy and security
 
-- TypeSafe receives the prompt plus minimal skill name/description/agent/scope for
-  routing. No skill bodies, paths, cwd or arbitrary metadata are sent.
+- TypeSafe receives the **raw prompt text** plus minimal skill name/description/
+  agent/scope for Jev routing. No skill bodies, paths, cwd or arbitrary metadata
+  are sent. Route sensitive prompts only when you accept this external data boundary;
+  local prompt hashing does not redact API requests.
 - Prompts are stored locally as installation-key HMACs by default; raw persistence
   requires explicit opt-in. `prompt: none` also exists.
 - SkillDispatch **does not upload local traces or invocation telemetry**. Its
@@ -279,13 +291,13 @@ adds latency and is only a recommendation. Native catalog completeness and routi
 accuracy are not guaranteed. There is no delivery witness, cloud sync, automatic
 threshold tuning or trace retention daemon.
 
-Future work, not included in this release: Codex advisory/observers, subagent-aware
-routing, richer evals, local/non-Jev providers and optional Studio integration.
+Possible future work: Codex advisory/observers, subagent-aware routing, richer evals,
+local/non-Jev providers and optional external visualization integrations.
 
 ## Contributing and release
 
-See [CONTRIBUTING](CONTRIBUTING.md), the [release checklist](docs/RELEASE_CHECKLIST.md)
-and [launch drafts](docs/LAUNCH.md). Normal tests/CI never call TypeSafe. Please bring
+See [CONTRIBUTING](CONTRIBUTING.md) and the [release checklist](docs/RELEASE_CHECKLIST.md).
+Normal tests/CI never call TypeSafe. Please bring
 sanitized edge cases, especially catalog mismatches and overlapping descriptions.
 
 [MIT License](LICENSE). Runtime dependency license details are recorded in

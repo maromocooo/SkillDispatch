@@ -8,8 +8,8 @@ company data, or unredacted traces in a public issue.
 Use GitHub's **Security → Report a vulnerability** for this repository when enabled:
 https://github.com/maromocooo/SkillDispatch/security/advisories/new
 
-Private vulnerability reporting was **not enabled** during release-candidate review.
-It must be enabled by the maintainer before public launch. If the button is absent,
+Maintainers must enable private vulnerability reporting before publication.
+If the button is absent,
 open a public issue containing only “Please enable private vulnerability reporting”
 and wait for a private channel; do not include exploit details or sensitive data.
 No security inbox or response-time guarantee is claimed.

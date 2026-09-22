@@ -20,7 +20,7 @@ export function createProgram(
 ): Command {
   const program = new Command()
     .name("skilldispatch")
-    .description("Universal, observable skill routing for coding agents.")
+    .description("Observable skill routing for Claude Code and Codex.")
     .version(VERSION)
     .exitOverride()
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
