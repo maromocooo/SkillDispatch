@@ -833,7 +833,10 @@ RouteTrace v1 gains optional `capabilities.skillInvocationTelemetry: true` and
 optional decision `catalogIdentity` (existing adapter-owned path-free digest).
 Legacy records remain valid. A capability is emitted only on Claude routes with
 a prompt ID, checked observer registrations and user-authorized safe storage.
-This is a cohort marker, not a delivery guarantee. It contains no raw native IDs
+The marker means only that observer registration and local persistence
+prerequisites were detected at routing time. It does not establish session reload,
+observer execution, delivery or complete observation. Missing events do not prove
+non-invocation. It contains no raw native IDs
 or tool payloads. Existing recommended/selected and emitted/injected meanings are
 unchanged; routing traces are immutable.
 
@@ -841,21 +844,36 @@ unchanged; routing traces are immutable.
 lifecycle state by session/tool keys, independent of physical append order. It
 deduplicates tool+phase using timestamp, event UUID and canonical record ordering.
 Contradictory identifiers/prompt IDs or both success and failure are unknown and
-excluded from conversion credit. A post event lacking prompt ID may complete an
+excluded from observed-adoption credit. A post event lacking prompt ID may complete an
 attempt with the same session/tool ID; an attempt without prompt ID never gets
-route conversion credit. Attempted-only means terminal outcome not observed.
+observed route-adoption credit. Attempted-only means terminal outcome not observed.
 No completion is inferred from timeouts or permission denial.
 
-The advisory funnel uses observer-capable Claude advisory route × catalog identity
-× content hash pairs. It matches exact session/prompt and resolved main-context
-attempts. Repeated calls of one skill count once per route pair. Independent calls
-of a non-injected recommendation remain model-invoked recommendations, but only
-injected-and-invoked pairs contribute to the injection conversion numerator.
-Success requires that an eligible attempt's tool lifecycle has a success event.
+The advisory funnel counts observer-configured Claude advisory route × catalog
+identity × content hash pairs. `traceObserverConfigured` checks only the routing-time
+marker; current stream readability and presence of correlation keys are separate.
+`telemetryConfiguredTraces` / `telemetryUnconfiguredTraces` therefore cannot imply
+complete observation. Old/no-marker records are outside pair counts, never negative
+examples. Configured records lacking prompt/session keys or readable storage count
+as `uncorrelatableTraces`; their known recommendations/injections remain counted.
+Decisions lacking catalog identity count as `uncorrelatablePairs`, outside pair totals.
+
+`observedModelInvoked` matches exact session/prompt and resolved main-context attempts.
+Repeated calls of one skill count once per route pair. `observedSucceeded` requires
+that such an attempted lifecycle has an observed success event. Neither the absence
+of an attempt nor the absence of a terminal event establishes a negative.
+`injectedPairsWithoutObservedInvocation` counts injected pairs without a matching
+resolved main-context attempt in this read snapshot, including unavailable
+correlation. It is not a non-invocation count. Per-skill JSON exposes the same
+positive-evidence counts; no exact conversion or success rates are returned.
 Subagent events are shown with their kind but excluded from main-turn adoption.
-Old/no-marker/no-prompt/unreadable-storage cohorts are unavailable, never negative
-examples. Undefined ratios are null. Per-skill JSON counts are deterministically
-ordered. Stream health is global; routing filters choose conversion cohorts.
+
+`show` projects `observerConfigured`, `streamReadable`, `correlationAvailable` and
+observed `calls` separately, without HMAC keys. Correlation availability means a
+join can be attempted, not that observation is complete. Per-skill counts are
+ordered deterministically. Stream health is global; routing filters choose adoption
+cohorts. Exact conversion would require a future per-turn completeness witness;
+PR9 does not add one or change the observer's async/silent/fail-open behavior.
 
 The index stores only lifecycle state, not all JSONL bytes or prompt bodies.
 Memory still grows with unique tool calls and skill versions; bounded-memory

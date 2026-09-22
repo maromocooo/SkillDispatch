@@ -71,31 +71,56 @@ and its existing 2500 ms route budget are unchanged.
 - RouteTrace v1's optional capability marker and decision catalogIdentity are
   additive. Existing PR4–PR8 shadow/advisory records remain valid/readable.
 
-## Funnel semantics
+## Observed-adoption semantics (PR9 review hardening)
 
-Recommended and injected counts use route-skill-version pairs. Model-invoked
-requires a resolved attempted call with exact session/prompt/catalog/content;
-succeeded requires a success for that attempted tool lifecycle. Repeated calls
-count once per route pair. Injection conversion uses injected-and-invoked pairs
-as numerator; success conversion uses successful/invoked pairs. Zero denominators
-are null/N/A. Only main-context events credit main-turn recommendations.
+Hardening starts at `4cd96c3` on the same PR9 branch; no main merge or history
+rewrite. Recommended and injected counts use route-skill-version pairs from
+observer-configured Claude advisory traces. `observedModelInvoked` requires an
+observed resolved attempted call with exact session/prompt/catalog/content;
+`observedSucceeded` requires an observed success for that attempted tool lifecycle.
+Repeated calls count once per route pair. Only main-context events credit main-turn
+recommendations. These are positive evidence, not complete observation.
 
-Lifecycle matching is independent of append order. Duplicates are deterministic;
-contradictory lifecycles are unknown. Attempted-only is not failed. Missing prompt
-ID on an attempt cannot receive funnel credit; a terminal event can join by tool
-ID when its attempt supplies the exact prompt correlation. Old traces without
-observer capability are telemetry unavailable and excluded from denominators.
-Separate stream health reports raw/deduplicated attempts, terminal events,
-unresolved calls, corrupt lines and duplicates; `--since` filters routing cohorts,
-not global stream health. `show` exposes lifecycle labels, never HMAC keys.
+The capability marker means **observer registration and local persistence
+prerequisites were detected at routing time**. Configured does not mean delivered,
+host reloaded, or completely observed. Async delivery is not guaranteed. Missing
+events remain unknown, never proof of non-invocation or failure.
+
+`injectedToModelInvoked` and `modelInvokedToSucceeded` are removed from summary JSON
+and CLI. Exact conversion/success percentages are intentionally not reported.
+`injectedPairsWithoutObservedInvocation` counts injected pairs without a matching
+resolved main-context attempted event in the snapshot, not "not invoked".
+`telemetryConfiguredTraces` and `telemetryUnconfiguredTraces` report marker presence
+independently of stream readability. Configured records lacking correlation keys
+or a readable stream are `uncorrelatableTraces`, retaining their known
+recommendation/injection counts. Decisions lacking catalog identity are
+`uncorrelatablePairs`, outside pair totals. Per-skill counts use the same shape.
+
+Lifecycle matching remains independent of append order. Duplicates are deterministic;
+contradictory lifecycles are unknown. Attempted-only is not failed/not succeeded;
+actual succeeded/failed events remain factual. Missing prompt ID on an attempt
+cannot receive adoption credit; a terminal event can join by tool ID when its
+attempt supplies the exact prompt correlation. Old traces without the marker are
+telemetry unavailable and excluded from adoption counts, never treated as negatives.
+
+`show` reports "Model skill invocations observed" and exposes separate
+`observerConfigured`, `streamReadable`, `correlationAvailable` and `calls` fields.
+An empty list means none observed, not none occurred. Stream health retains event
+counts, corrupt lines, duplicates, unresolved and attempted-only lifecycles;
+`--since` filters routing cohorts, not global stream health. No HMACs are printed.
+
+Exact conversion could be enabled by a future per-turn observation-completeness
+witness. PR9 adds no Stop/PermissionDenied hook, acknowledgement, worker or sync
+observer. Pre/Post/Failure observers remain async, silent and fail-open. Direct
+user `/skillname` invocation stays outside model-adoption metrics.
 
 ## Validation
 
-Final verification on Node **20.20.2** and **24.12.0** (pnpm 10.17.1):
+Post-hardening verification on Node **20.20.2** and **24.12.0** (pnpm 10.17.1):
 
 | Check | Node 20 | Node 24 |
 |---|---|---|
-| `pnpm test` | 860 / 56 files PASS | 860 / 56 files PASS |
+| `pnpm test` | 868 / 56 files PASS | 868 / 56 files PASS |
 | `pnpm typecheck` | PASS | PASS |
 | `pnpm lint` | PASS | PASS |
 | `pnpm build` (including declarations) | PASS | PASS |
@@ -103,7 +128,7 @@ Final verification on Node **20.20.2** and **24.12.0** (pnpm 10.17.1):
 | Offline tarball installation | PASS | PASS |
 | All five installed-package smoke scripts | PASS | PASS |
 
-The original 788 tests remain, with 72 added cases: observer/parser/storage/privacy
+The pre-review PR9 suite had 860 tests: the original 788 plus 72 cases covering observer/parser/storage/privacy
 (36), lifecycle/funnel (22), registration/readiness (10), routing capability marker
 (4). Schema tests validate emitted invocation events with AJV and compare shipped
 JSON Schema to Zod output. Existing route schema drift/legacy compatibility tests
@@ -112,13 +137,25 @@ subagent projection, control-byte-safe tuple correlation, private storage and
 corrupt lines, partial/unavailable observability, cross-session/prompt isolation,
 physical order reversal, duplicates and unknown attempted-only outcomes.
 
+All 860 existing cases remain after hardening, with 8 added regression cases:
+4 analytics cases (configured/no event, simulated async loss/missing terminal,
+positive success evidence without ratios, old-marker exclusion) and 4 CLI cases
+(no event, attempt only, success, failure). Tests pin overall/per-skill JSON keys,
+exclude former ratio/negative fields, verify observed-only labels and keep private
+HMACs/payloads out of both text and JSON. Local configured state remains distinct
+from unreadable storage or missing correlation. Schema drift checks pass with the
+expanded capability description; no trace data migration is needed.
+
 Tarballs were installed into separate temporary directories using the offline pnpm
 store. Both Node versions ran:
 
 - `scripts/claude-invocation-smoke.mjs`: generated installed advisory command →
   immutable route trace → Post before Pre Skill events → exact HMAC match →
-  show/summary funnel (1 recommended/injected/model-invoked/succeeded), observer
-  status/doctor, targeted uninstall, privacy, malformed/oversized silent hooks.
+  show/summary counts (1 recommended/injected/observed model-invoked/observed
+  succeeded), observer status/doctor, targeted uninstall, privacy, malformed/
+  oversized silent hooks. Before any observer events are sent, the installed CLI
+  also verifies configured=true, observed counts=0, "observed: none", and absence
+  of exact conversion fields. No host reload or negative invocation is inferred.
 - `scripts/claude-advisory-smoke.mjs`: shadow/advisory reconciliation and bounded
   output, unchanged routing behavior.
 - `scripts/claude-catalog-smoke.mjs`: mixed local/project/synced/plugin catalog,
@@ -140,6 +177,8 @@ plugins, synced skills and existing traces were not changed.
 - Observers are async/best effort. A short-lived host or slow filesystem/discovery
   can lose events; marker/readiness confirms local prerequisites, not delivery.
   Missing invocation records mean not observed, not proof of non-invocation.
+  Exact conversion percentages intentionally remain unavailable until a future
+  completeness witness exists; this is not a blocker for positive-evidence analytics.
 - User-scope registration inspection does not prove active host reload, trust,
   managed policy or per-session `--settings` behavior. Restart/reload Claude after
   `skilldispatch hooks install claude`; check status and doctor separately.

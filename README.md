@@ -918,17 +918,27 @@ Observer persistence uses user configuration only, even if project routing
 configuration was explicitly trusted. It never invokes Jev.
 
 `skilldispatch traces summary` now reports an advisory funnel; `traces show <id>`
-shows same-prompt model Skill lifecycles. **Recommended ≠ injected ≠ model-invoked
-≠ succeeded**. Success means the native Skill tool completed, not that Claude
+shows same-prompt model Skill lifecycles. **Recommended ≠ injected ≠ observed
+model-invoked ≠ observed succeeded**. Observed success means the native Skill tool
+completed, not that Claude
 followed the skill or improved the task outcome. Direct user `/skillname`
 invocations use a separate host path and are not model adoption.
 
-Conversions count route × logical skill-version pairs, only for Claude advisory
-traces with confirmed local observer capability and exact session/prompt keys.
-Old traces are **telemetry unavailable**, not negative examples. Attempts without
-a terminal event remain unknown; async hooks can be terminated with the host.
-Subagent-marked events remain visible separately and do not count as main-turn
-adoption. No transcript parsing or online calls are used to fill gaps.
+Adoption counts use route × logical skill-version pairs for observer-configured
+Claude advisory traces. Observed adoption requires exact session/prompt keys.
+The invocation observer is **async / best-effort**: absence of an invocation event
+is not proof that Claude did not invoke the skill. An observed attempt without a
+terminal event has an **unknown** outcome, not failure. This telemetry provides
+positive evidence of adoption, not complete negative observation. Exact
+injection-to-invocation conversion and invocation success percentages are
+intentionally not reported; they require a future per-turn observation-completeness
+mechanism. No completeness witness is implemented in PR9.
+
+Old traces without the capability marker are **telemetry unavailable**, outside
+these adoption counts rather than negative examples. Subagent-marked events remain
+visible separately and do not count as main-turn adoption. Direct user `/skillname`
+invocation remains outside model-adoption metrics. No transcript parsing or online
+calls are used to fill gaps.
 
 After updating an existing installation:
 
@@ -942,8 +952,10 @@ pnpm skilldispatch traces summary --since 24h
 pnpm skilldispatch traces show <route-trace-id>
 ```
 
-Registration checks are local prerequisites, not proof that host policy permits
-execution or that a background observer finished. No real-user settings are
+`capabilities.skillInvocationTelemetry: true` means observer registration and local
+persistence prerequisites were detected **at routing time**. Configured ≠ delivered
+≠ completely observed: it does not confirm host reload, host policy permission,
+observer startup, delivery, or complete observation of that turn. No real-user settings are
 changed during tests. All three observer handlers use exact matcher `Skill` and
 `skilldispatch hook claude-skill`; `hooks uninstall claude` removes only the
 managed routing/observer registrations. Codex remains shadow-only.
@@ -956,17 +968,35 @@ Invocation storage has no project-configurable destination: it is always
 disables observers even with trusted project routing config. `telemetry.prompt`
 does not enable prompt/argument persistence for observers.
 
-Summary's advisory funnel contains only observer-capable same-prompt records;
-existing advisory totals still include older records. `modelInvoked` counts
-recommended pairs with an observed main-context attempt. Injected-to-model
-conversion uses the intersection of injected and model-invoked pairs, so an
-independently invoked recommendation cannot inflate it. Success requires an
-observed success for an attempted tool lifecycle. Zero denominators yield
-`null` / `n/a`. Per-skill pair counts are available in summary JSON.
+Summary JSON's `advisoryFunnel` reports facts, with no conversion-rate fields:
+
+- `recommended`, `injected`: route-skill-version pairs from configured advisory
+  traces. Existing top-level advisory totals still include older records.
+- `observedModelInvoked`: recommended pairs with an exact resolved main-context
+  attempted event. Multiple attempts of one skill count once per route pair.
+- `observedSucceeded`: those pairs with an observed success for the same attempted
+  tool lifecycle. An actual failure event remains a factual failed lifecycle.
+- `injectedPairsWithoutObservedInvocation`: injected pairs lacking a matching
+  resolved main-context attempt in the read snapshot. This means **no matching event
+  observed**, including missing/unresolvable events or unavailable correlation;
+  it never means not invoked.
+- `telemetryConfiguredTraces`, `telemetryUnconfiguredTraces`: marker present/absent
+  among Claude advisory traces, independent of current stream readability.
+- `uncorrelatableTraces`: configured traces without session/prompt keys or a readable
+  stream. Their recommendation/injection facts remain counted. `uncorrelatablePairs`
+  counts selected decisions without logical identity, excluded from pair totals.
+- `skills`: the same pair counts per skill version, in deterministic order.
+
+`traces show` labels **Model skill invocations observed** and distinguishes
+`observerConfigured`, `streamReadable` and `correlationAvailable` in JSON. None of
+these confirms delivery or completeness. An empty `calls` array means no matching
+lifecycle was observed, not that Claude did nothing. The pre-merge PR9 fields
+`injectedToModelInvoked` and `modelInvokedToSucceeded` have been removed.
 
 Invocation stream health counts cover the full stream, while `--since` / `--agent`
 filter routing cohorts and their funnel. Invalid lines are counted and skipped;
-an unreadable/unsafe stream makes telemetry unavailable. No records are repaired,
+an unreadable/unsafe stream makes correlation unavailable without erasing the
+routing-time configuration marker. No records are repaired,
 removed or uploaded. Raw prompt text, hashes and host correlation keys are never
 printed by trace commands. Matching is exact: aliases, unresolved/bundled names
-and changed catalog/content versions cannot receive speculative conversion credit.
+and changed catalog/content versions cannot receive speculative observed-adoption credit.
