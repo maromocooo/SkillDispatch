@@ -9,6 +9,41 @@ import * as api from "../../src/index.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path: string) => readFile(resolve(root, path), "utf8");
+async function publicDocs() {
+  return [
+    "README.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    ...(await readdir(resolve(root, "docs")))
+      .filter((name) => name.endsWith(".md"))
+      .sort()
+      .map((name) => `docs/${name}`),
+    "benchmarks/public-routing-v1/README.md",
+    "examples/demo/README.md",
+  ];
+}
+
+function headingAnchors(markdown: string): Set<string> {
+  const seen = new Map<string, number>();
+  const anchors = new Set<string>();
+  let fenced = false;
+  for (const line of markdown.split("\n")) {
+    if (/^\s*```/.test(line)) fenced = !fenced;
+    if (fenced) continue;
+    const heading = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
+    if (heading === undefined) continue;
+    const slug = heading
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\p{M}_\- ]/gu, "")
+      .replace(/ /g, "-");
+    const count = seen.get(slug) ?? 0;
+    anchors.add(count ? `${slug}-${count}` : slug);
+    seen.set(slug, count + 1);
+  }
+  return anchors;
+}
 async function publicCatalog() {
   const base = "benchmarks/public-routing-v1/skills";
   return (
@@ -61,7 +96,16 @@ describe("public release artifacts", () => {
     expect(pkg.exports).toEqual({
       ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
     });
-    expect(pkg.files).not.toContain("tests");
+    expect(pkg.files).toEqual([
+      "dist",
+      "schemas",
+      "examples/demo",
+      "examples/*.yaml",
+      "evals",
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+    ]);
     expect(pkg.scripts).not.toHaveProperty("postinstall");
   });
   it("resolves every fixed benchmark label against the public synthetic catalog", async () => {
@@ -158,23 +202,46 @@ describe("public release artifacts", () => {
     expect(publish.jobs.publish.permissions["id-token"]).toBe("write");
   });
   it("keeps public documentation relative file links resolvable", async () => {
-    for (const file of [
-      "README.md",
-      "SECURITY.md",
-      "CONTRIBUTING.md",
-      "docs/OPERATIONS.md",
-      "docs/RELEASE_CHECKLIST.md",
-      "docs/SECURITY_MODEL.md",
-      "docs/LAUNCH.md",
-      "benchmarks/public-routing-v1/README.md",
-    ]) {
+    for (const file of await publicDocs()) {
       const text = await read(file);
       for (const match of text.matchAll(/\]\(([^)]+)\)/g)) {
         const link = match[1] ?? "";
-        if (/^(?:https?:|#)/.test(link)) continue;
-        const target = resolve(root, dirname(file), link.split("#")[0] ?? "");
+        if (/^https?:/.test(link)) continue;
+        const [path, anchor] = link.split("#");
+        const target = path
+          ? resolve(root, dirname(file), path)
+          : resolve(root, file);
         expect(await stat(target), `${file}: ${link}`).toBeTruthy();
+        if (anchor && target.endsWith(".md"))
+          expect(
+            headingAnchors(await readFile(target, "utf8")),
+            `${file}: ${link}`,
+          ).toContain(decodeURIComponent(anchor));
       }
+    }
+  });
+  it("keeps retired internal artifacts out of the public working tree", async () => {
+    const names = await readdir(root);
+    for (const name of [
+      "IMPLEMENTATION_BRIEF.md",
+      "CODEX_PROMPT.md",
+      "SOURCES.md",
+    ])
+      expect(names).not.toContain(name);
+    expect(names.some((name) => /^PR\d+_VALIDATION\.md$/i.test(name))).toBe(
+      false,
+    );
+    const docs = await readdir(resolve(root, "docs"));
+    expect(docs).not.toContain("LAUNCH.md");
+    expect(docs.some((name) => /^PR\d+_VALIDATION\.md$/i.test(name))).toBe(
+      false,
+    );
+  });
+  it("keeps public guidance about current behavior instead of implementation history", async () => {
+    for (const file of await publicDocs()) {
+      expect(await read(file), file).not.toMatch(
+        /IMPLEMENTATION_BRIEF|CODEX_PROMPT|\bSOURCES\.md\b|\bLAUNCH\.md\b|\bPR\d+(?:_VALIDATION)?\b|\bhandoff\b|Agent Skill Studio|Studio integration/i,
+      );
     }
   });
 });
