@@ -689,7 +689,9 @@ The adapter pipeline is:
 1. `claude-settings`: bounded reads of user, CWD project, CWD legacy local,
    owned repository-root local settings (macOS/Linux), then file-managed base and
    ordered fragments. Per-key plugin enablement and non-plugin invocation overrides
-   merge at this boundary; malformed relevant state makes candidates non-routable.
+   merge at this boundary; malformed authoritative state makes candidates non-routable.
+   Each location retains its user/project/local/managed source, so source-specific
+   restrictions are resolved before normalization instead of flattening all keys.
 2. Existing direct personal/project traversal, plus file-managed enterprise skills.
    A local directory containing a plugin manifest is marked unsupported instead of
    being mislabeled as an unqualified native command.
@@ -705,6 +707,31 @@ The adapter pipeline is:
    copies are excluded. No recursive cache or marketplace skill enumeration.
 6. Apply frontmatter model restrictions, non-plugin `skillOverrides`, origin metadata,
    deterministic final ordering and native-identity duplicate diagnostics.
+
+Special catalog settings have their own scope and merge rules:
+
+- `syncClaudeAiSkills` can only opt out. A false from user, project-local or any
+  observed file-managed document suppresses synced discovery; a later true cannot
+  undo it. Shared project settings do not participate, even when false. The internal
+  default true only means no observed opt-out, not proof of a signed-in sync session.
+- `strictPluginOnlyCustomization` is read only from managed documents and normalized
+  to `strictPluginOnlySkills`. True locks skills; a surface array locks them only if
+  it contains `skills`. Unknown string surfaces are ignored. Managed fragment arrays
+  combine, while scalar values follow existing file order. Non-managed values are
+  ignored without validation or catalog invalidation, even if their shape is invalid.
+- A skills lock preserves plugin and managed eligibility (subject to existing
+  manual-only/override checks). Local-user/local-project entries remain visible with
+  enabled/modelInvocable false; synced entries are not loaded. The policy would also
+  allow bundled skills, but this adapter does not discover them.
+- Unknown fields and ignored-source values do not invalidate settings. Malformed
+  authoritative catalog fields still produce a fixed diagnostic and conservative
+  non-routability. No raw value is included. EnabledPlugins continues its per-key
+  user < project < local < managed precedence, separately from these rules.
+
+Session `--settings`, non-file policy and live account state remain unobservable.
+The resolver neither guesses them nor executes policy helpers. These changes only
+control catalog eligibility; they do not implement hook-surface enforcement or
+mutate synced caches (including the host's own trash behavior).
 
 Plugin `strict: true` uses installed manifest metadata, with additional declared
 marketplace components. `strict: false` uses the marketplace entry, rejects a second

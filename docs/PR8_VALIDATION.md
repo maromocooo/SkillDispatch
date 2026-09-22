@@ -143,7 +143,7 @@ source diagnostics produce WARN, while preexisting installation/storage FAIL rul
 are unchanged. Neither command invokes Claude or TypeSafe, installs plugins, edits
 settings or appends a trace.
 
-## Validation results
+## Initial PR8 validation results (363c172)
 
 macOS, pnpm 10.17.1. Node is explicitly on PATH for each test runner and subprocess.
 
@@ -235,3 +235,84 @@ No known PR8 implementation blocker remains after these checks. Company-PC catal
 comparison and native availability remain dogfood follow-up; real storage/routing
 readiness must be addressed separately before interpreting missing traces. No PR9
 invocation telemetry, Codex advisory or subagent work was started.
+
+
+## Settings-resolution review hardening
+
+Applied on the same `feat/pr8-claude-native-catalog` branch after clean/synchronized
+`363c172`. Main remains at `1ad089b`; no merge, rebase, amend or history rewrite.
+
+Rechecked current official [settings precedence](https://code.claude.com/docs/en/settings#exceptions-to-managed-settings-precedence),
+[managed source rules](https://code.claude.com/docs/en/managed-settings), and
+[settings reference](https://code.claude.com/docs/en/settings-reference#syncclaudeaiskills).
+The large reference page exceeded the web tool's response limit, so its official
+Markdown version was downloaded read-only to a temporary file. Its
+[strict customization policy](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization)
+and skills-surface entries confirm managed-only scope, surface arrays, ignored
+unknown names and continued managed/plugin/bundled availability. No host binary
+inspection, Claude subprocess or undocumented session scraping was used.
+
+The review found two incorrect initial assumptions: sync was a last-write-wins
+boolean, and strict customization was a boolean from any scope that blocked all
+non-plugin origins. Both are corrected:
+
+| Setting | Resolution |
+| --- | --- |
+| sync unset / true | No opt-out; never forces syncing on or undoes false |
+| sync false in user / local / file-managed | Restrictive opt-out; synced source is not loaded |
+| sync in shared project | Ignored; the repository cannot disable the user's sync |
+| strict policy in user / project / local | Ignored, including values invalid in managed scope |
+| managed strict true | Skills surface locked |
+| managed strict surface array | Locked only if it contains `skills`; unknown strings ignored |
+| skills locked | Plugin and managed stay eligible; local remains visible/non-routable, synced omitted |
+
+The source-aware location representation is adapter-internal. `enabledPlugins`
+keeps the existing per-key user → project → local → managed behavior and all its
+prior regression tests. Managed arrays combine across file fragments; scalar values
+replace in existing file order. Boolean false leaves the skills lock off. No core
+contract, provider payload, trace schema, catalog source, registration or timeout
+changes were made.
+
+Malformed authoritative fields still conservatively disable routing and emit
+`invalid_claude_settings`. A string in a boolean sync field, or a non-string in a
+managed surface array, is treated differently from an unknown string surface or an
+out-of-scope policy. Unknown fields and ignored values do not invalidate a catalog.
+Managed/manual-only skills still honor manual invocation restrictions; the lock
+only preserves their eligibility, not permission to bypass those restrictions.
+
+CLI `--settings` opt-outs, MDM/server/parent policy and live account availability
+remain unobservable. True/default is not a claim of syncing or native visibility.
+No cache is downloaded, moved to trash, deleted, or modified. Bundled skills remain
+policy-allowed but undiscovered, with no new scope added in this hardening.
+
+Added 38 fixture integration tests: 14 sync-source combinations and 24 managed-policy,
+source-isolation, malformed/unknown-field and routing/advisory checks. They cover user
+false against project/managed true, shared project false ignored, local and managed
+opt-outs, false surviving later managed fragments, true-only/unset, all five origins,
+boolean and surface arrays, unknown surfaces, ignored non-managed policy, and actual
+provider candidates plus native advisory containing managed and plugin skills only.
+All tests use temporary roots and a fetch trap; existing 750 tests are retained.
+
+Final hardening validation (macOS, pnpm 10.17.1):
+
+| Check | Node 20.20.2 | Node 24.12.0 |
+| --- | --- | --- |
+| `pnpm test` | 788 passed / 53 files | 788 passed / 53 files |
+| `pnpm typecheck` / `pnpm lint` | PASS | PASS |
+| `pnpm build` / `pnpm pack` | PASS | PASS |
+| Installed native catalog E2E | PASS | PASS |
+| Installed advisory / onboarding / trace-ops E2E | PASS | PASS |
+
+Tarballs are independently installed offline beneath
+`/tmp/skilldispatch-pr8-hardening20` and `/tmp/skilldispatch-pr8-hardening24`; the
+four existing package scripts above are rerun with the matching Node on PATH.
+They cover mixed native catalog routing, generated hook execution, mode reconciliation,
+private trace/analytics and existing public commands. No real user configuration or
+Skill files are changed. Tests use mock/fake/loopback only, with no external TypeSafe
+API request. Official-doc fetches and Git operations are separate network activities.
+No new real-home or live Jev smoke was performed for these settings fixes.
+
+No known blocker for this settings hardening remains. The previously documented
+company-PC catalog comparison and live session/managed-policy visibility limits
+remain; this change does not claim native invocation telemetry. Stop on PR8 without
+merging to main or beginning PR9.
