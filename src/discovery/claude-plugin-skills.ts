@@ -5,6 +5,7 @@ import { compareText } from "../core/order.js";
 import { claudeDiagnostic } from "./claude-files.js";
 import { invocationIdentity, safeInvocationSegment } from "./claude-origin.js";
 import type { ActivePlugin } from "./claude-plugins.js";
+import { isMissing } from "./filesystem.js";
 import { scanSources } from "./scan.js";
 import type { DiscoveryMetadata, DiscoveryResult } from "./types.js";
 
@@ -18,7 +19,22 @@ export async function discoverPluginSkills(
     let invalid = false;
     for (const root of plugin.paths) {
       const sources: { path: string; scope: "user" | "repo" | "admin" }[] = [];
-      for (const directory of plugin.skillDirectories) {
+      const skillDirectories = [...plugin.skillDirectories];
+      if (plugin.rootSkillFallback) {
+        try {
+          await lstat(join(root, "skills"));
+        } catch (error) {
+          if (isMissing(error)) {
+            try {
+              if ((await lstat(join(root, "SKILL.md"))).isFile())
+                skillDirectories.push(".");
+            } catch {
+              /* No root skill; no speculative traversal. */
+            }
+          }
+        }
+      }
+      for (const directory of skillDirectories) {
         const path = join(root, directory);
         // Reject component-parent symlinks too, including a/alias/b layouts.
         let parent = path;
@@ -47,7 +63,7 @@ export async function discoverPluginSkills(
       const scanned = await scanSources("claude-code", sources, {
         followSymlinks: false,
         parserOptions: (path) => ({
-          fallbackName: path === root ? plugin.name : basename(path),
+          fallbackName: basename(path),
           fallbackDescriptionFromBody: true,
           allowMissingFrontmatter: true,
         }),

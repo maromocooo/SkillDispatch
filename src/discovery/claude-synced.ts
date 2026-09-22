@@ -16,6 +16,7 @@ export async function discoverSyncedSkills(
     accounts.map((account) => ({ path: join(root, account), scope: "user" })),
     {
       followSymlinks: false,
+      rootSkill: false,
       parserOptions: (path) => ({
         fallbackName: basename(path),
         fallbackDescriptionFromBody: true,

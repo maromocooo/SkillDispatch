@@ -229,7 +229,7 @@ excluded. `CLAUDE_CODE_PLUGIN_CACHE_DIR` overrides the **plugins parent**, not o
 its cache. No host commands, installation or enablement mutations are performed.
 
 Active plugin skills load only from registry installation roots (`skills/` and safe
-manifest-declared skill directories), with `plugin-name:<frontmatter-name>` or a
+manifest/marketplace-declared skill directories and single-skill roots), with `plugin-name:<frontmatter-name>` or a
 directory-name fallback, per current Claude docs. Personal/project names still use
 the directory. `metadata.claude` records origin separately from scope. Manual-only
 skills remain discoverable but cannot become routing/advisory candidates. Explicit
@@ -505,9 +505,10 @@ invocation and body loading. SkillDispatch uses adapter provenance, restricts na
 to letters/numbers/marks/underscore/ASCII hyphen (max 128 characters), and omits
 ambiguous invocation names across the entire discovered catalog. It does not
 reimplement host precedence. `disable-model-invocation` and disabled skills are
-checked again before delivery. Plugin, synced, bundled, legacy, additional-directory
-and nested lazy-loaded skills are not newly supported. Full `skillOverrides`,
-managed settings and native session availability are not modeled: Claude's native
+checked again before delivery. Synced and active installed plugin names are supported
+by PR8. Bundled, legacy, additional-directory and nested lazy-loaded skills remain
+unsupported. File-based `skillOverrides` restrictions are checked; MDM/server/CLI
+settings and native session availability are not fully modeled: Claude's native
 permission/invocation mechanism remains authoritative; this is a recommendation,
 not a bypass or a guarantee of invocation.
 

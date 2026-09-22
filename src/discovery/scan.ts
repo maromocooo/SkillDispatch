@@ -10,6 +10,7 @@ import type { DiscoveryResult, DiscoverySource } from "./types.js";
 interface ScanOptions {
   recursive?: boolean;
   followSymlinks?: boolean;
+  rootSkill?: boolean;
   skipDirectory?: (name: string) => boolean;
   parserOptions?: (path: string) => Partial<ParseSkillContext>;
 }
@@ -65,7 +66,10 @@ export async function scanSources(
         const entries = (
           await readdir(canonical, { withFileTypes: true })
         ).sort((a, b) => compareText(a.name, b.name));
-        const file = entries.find((entry) => entry.name === "SKILL.md");
+        const file =
+          depth === 0 && options.rootSkill === false
+            ? undefined
+            : entries.find((entry) => entry.name === "SKILL.md");
         if (file) {
           if (options.followSymlinks === false && file.isSymbolicLink()) {
             warn("unsafe_claude_source", "Symlink skill file excluded.", path);

@@ -1,3 +1,4 @@
+import { lstat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import type { Diagnostic } from "../core/types.js";
 import { finalizeCatalog } from "./catalog.js";
@@ -15,7 +16,7 @@ import {
   managedClaudeDirectory,
 } from "./claude-settings.js";
 import { discoverSyncedSkills } from "./claude-synced.js";
-import { projectDirectories } from "./filesystem.js";
+import { canonicalPath, isMissing, projectDirectories } from "./filesystem.js";
 import { scanSources } from "./scan.js";
 import type {
   DiscoveryAdapter,
@@ -33,9 +34,11 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
 
   async discover(context: DiscoveryContext) {
     const directories = await projectDirectories(context.cwd);
-    const configHome = resolve(
-      context.cwd,
-      context.env?.CLAUDE_CONFIG_DIR || join(context.home, ".claude"),
+    const configHome = await canonicalPath(
+      resolve(
+        context.cwd,
+        context.env?.CLAUDE_CONFIG_DIR || join(context.home, ".claude"),
+      ),
     );
     const pluginRoot = resolve(
       context.cwd,
@@ -81,6 +84,25 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       const discovery = skill.metadata.discovery as DiscoveryMetadata;
       const name = basename(dirname(discovery.path));
       skill.metadata.commandName = name;
+      let skillDirectoryPlugin = false;
+      try {
+        await lstat(
+          join(dirname(discovery.path), ".claude-plugin/plugin.json"),
+        );
+        skillDirectoryPlugin = true;
+      } catch (error) {
+        if (!isMissing(error)) skillDirectoryPlugin = true;
+      }
+      if (skillDirectoryPlugin) {
+        skill.enabled = false;
+        result.diagnostics.push({
+          code: "unsupported_plugin_layout",
+          level: "warning",
+          message:
+            "Skills-directory plugin requires native session state; excluded from routing.",
+          skillIds: [skill.id],
+        });
+      }
       skill.metadata.claude = {
         origin:
           skill.scope === "admin"
@@ -89,7 +111,9 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
               ? "local-user"
               : "local-project",
         modelInvocable: skill.enabled,
-        ...(safeInvocationSegment(name) ? { nativeInvocationName: name } : {}),
+        ...(!skillDirectoryPlugin && safeInvocationSegment(name)
+          ? { nativeInvocationName: name }
+          : {}),
       };
     }
     result.diagnostics.push(...diagnostics);

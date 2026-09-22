@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { lstat, open, opendir, realpath } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { type Node, type ParseError, parseTree } from "jsonc-parser";
 import { compareText } from "../core/order.js";
 import type { Diagnostic } from "../core/types.js";
@@ -30,6 +30,7 @@ export async function readClaudeJson(
   code: string,
 ): Promise<Record<string, unknown> | undefined> {
   try {
+    if ((await lstat(dirname(path))).isSymbolicLink()) throw new Error();
     const before = await lstat(path);
     if (
       !before.isFile() ||

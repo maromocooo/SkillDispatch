@@ -30,6 +30,7 @@ export interface ActivePlugin {
   scope: PluginRecord["scope"];
   paths: string[];
   skillDirectories: string[];
+  rootSkillFallback: boolean;
 }
 const manifestSchema = z.object({
   name: token,
@@ -77,7 +78,7 @@ export async function resolveClaudePlugins(
     if (enabled && !Object.hasOwn(entries, id))
       claudeDiagnostic(diagnostics, "plugin_install_missing");
   }
-  // Read only the registry-selected marketplace's manifest if a default is needed.
+  // Read only registry-selected marketplace manifests; never traverse their skill trees.
   let known: Record<string, unknown> | undefined;
   let knownLoaded = false;
   let knownInvalid = false;
@@ -183,7 +184,11 @@ export async function resolveClaudePlugins(
       }
       records.push(record);
     }
-    if (invalid || !records.length) continue;
+    if (invalid) continue;
+    if (!records.length) {
+      if (!raw.length) claudeDiagnostic(diagnostics, "plugin_install_missing");
+      continue;
+    }
     const versions = new Set(records.map((r) => r.version));
     if (versions.size !== 1) {
       claudeDiagnostic(diagnostics, "ambiguous_plugin_installation");
@@ -259,7 +264,6 @@ export async function resolveClaudePlugins(
     // Component merging / strict:false marketplace-only manifests need host state;
     // never guess additional component roots from a marketplace source.
     if (
-      entry?.skills !== undefined ||
       entry?.strict === false ||
       entry?.source === "." ||
       entry?.source === "./"
@@ -267,13 +271,21 @@ export async function resolveClaudePlugins(
       claudeDiagnostic(diagnostics, "unsupported_plugin_layout");
       continue;
     }
-    const custom =
-      manifest.skills === undefined
-        ? []
-        : typeof manifest.skills === "string"
-          ? [manifest.skills]
-          : manifest.skills;
-    const skillDirectories = ["./skills", ...custom];
+    const declared = z
+      .union([z.string(), z.array(z.string()).max(64)])
+      .optional()
+      .safeParse(entry?.skills);
+    if (!declared.success) {
+      claudeDiagnostic(diagnostics, "invalid_plugin_marketplace");
+      continue;
+    }
+    const paths = (value: string | string[] | undefined) =>
+      value === undefined ? [] : typeof value === "string" ? [value] : value;
+    const skillDirectories = [
+      "./skills",
+      ...paths(manifest.skills),
+      ...paths(declared.data),
+    ];
     if (
       skillDirectories.some(
         (path) =>
@@ -294,6 +306,8 @@ export async function resolveClaudePlugins(
       scope: primary.scope,
       paths: [...roots].sort(compareText),
       skillDirectories: [...new Set(skillDirectories)],
+      rootSkillFallback:
+        manifest.skills === undefined && declared.data === undefined,
     });
   }
   return active;

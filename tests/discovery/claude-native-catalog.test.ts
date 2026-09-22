@@ -1,4 +1,4 @@
-import { cp, mkdir, rename, symlink } from "node:fs/promises";
+import { cp, mkdir, rename, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { route } from "../../src/core/route.js";
@@ -463,5 +463,80 @@ describe("Claude native catalog integration", () => {
       (await f.run()).skills.find((s) => claudeMetadata(s)?.origin === "plugin")
         ?.id,
     ).toBe(before?.id);
+  });
+  it("loads an automatic single-skill plugin root using the declared native name", async () => {
+    const f = await catalogFixture();
+    await rm(join(f.installed, "skills"), { recursive: true });
+    await write(join(f.installed, "SKILL.md"), skillText("root-native"));
+    expect((await f.run()).skills.map(claudeInvocationName)).toContain(
+      "codex:root-native",
+    );
+  });
+  it("adds marketplace-declared components only under the installed root", async () => {
+    const f = await catalogFixture();
+    const market = join(f.plugins, "marketplaces/selected");
+    await write(
+      join(f.plugins, "known_marketplaces.json"),
+      JSON.stringify({ market: { installLocation: market } }),
+    );
+    await write(
+      join(market, ".claude-plugin/marketplace.json"),
+      JSON.stringify({
+        plugins: [
+          {
+            name: "registry-slug",
+            source: "./plugins/tool",
+            skills: "./extra",
+          },
+        ],
+      }),
+    );
+    await write(
+      join(f.installed, "extra/direct/SKILL.md"),
+      skillText("extra-native"),
+    );
+    await write(
+      join(market, "extra/not-installed/SKILL.md"),
+      skillText("excluded"),
+    );
+    const names = (await f.run()).skills.map(claudeInvocationName);
+    expect(names).toContain("codex:extra-native");
+    expect(names).toContain("codex:native-name");
+    expect(names).not.toContain("codex:excluded");
+  });
+  it("does not misidentify a skills-directory plugin as an unqualified local command", async () => {
+    const f = await catalogFixture();
+    await write(
+      join(f.config, "skills/wrapper/SKILL.md"),
+      skillText("wrapper"),
+    );
+    await write(
+      join(f.config, "skills/wrapper/.claude-plugin/plugin.json"),
+      JSON.stringify({ name: "wrapped-plugin" }),
+    );
+    const result = await f.run();
+    expect(result.skills.find((s) => s.name === "wrapper")?.enabled).toBe(
+      false,
+    );
+    expect(result.diagnostics.map((d) => d.code)).toContain(
+      "unsupported_plugin_layout",
+    );
+  });
+  it("diagnoses invalid plugin SKILL.md without exposing source path or content", async () => {
+    const f = await catalogFixture();
+    await write(
+      join(f.installed, "skills/broken/SKILL.md"),
+      "---\nname: [PRIVATE_DATA\n---",
+    );
+    const result = await f.run();
+    const diagnostics = result.diagnostics.filter(
+      (d) => d.code === "invalid_yaml",
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(JSON.stringify(diagnostics)).not.toContain("PRIVATE_DATA");
+    expect(JSON.stringify(diagnostics)).not.toContain(f.installed);
+    expect(result.skills.map(claudeInvocationName)).toContain(
+      "codex:native-name",
+    );
   });
 });

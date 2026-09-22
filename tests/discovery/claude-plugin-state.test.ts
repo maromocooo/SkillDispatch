@@ -120,6 +120,34 @@ describe("Claude plugin installation state", () => {
       "plugin_install_missing",
     );
   });
+
+  it.each([
+    { scope: "user", version: "v1" },
+    { scope: "unknown", version: "v1", installPath: "/fixture" },
+  ])("rejects missing or unsupported installation fields", async (record) => {
+    const f = await fixture();
+    await f.registry([record]);
+    expect(await f.run()).toEqual([]);
+    expect(f.diagnostics.map((d) => d.code)).toContain(
+      "invalid_plugin_registry",
+    );
+  });
+  it("reports an enabled empty installation and malformed marketplace state", async () => {
+    const f = await fixture();
+    f.config.enabledPlugins.set("registry-name@market", true);
+    await f.registry([]);
+    expect(await f.run()).toEqual([]);
+    expect(f.diagnostics.map((d) => d.code)).toContain(
+      "plugin_install_missing",
+    );
+    await f.registry();
+    await write(join(f.root, "known_marketplaces.json"), "{INVALID_PRIVATE");
+    expect(await f.run()).toEqual([]);
+    expect(f.diagnostics.map((d) => d.code)).toContain(
+      "invalid_plugin_marketplace",
+    );
+    expect(JSON.stringify(f.diagnostics)).not.toContain("INVALID_PRIVATE");
+  });
   it("missing registry gives an empty catalog", async () => {
     const f = await fixture();
     expect(
