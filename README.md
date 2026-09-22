@@ -219,6 +219,15 @@ public local active-account selector, so SkillDispatch does not guess a winner.
 Identical duplicate versions collapse; differing content stays visible for review.
 This is an offline cache snapshot, not proof of current account/session availability.
 
+Plugin state resolution uses only version-2 `installed_plugins.json` records and
+installed manifests. `enabledPlugins` merges user → CWD project → local → file
+managed settings. Explicit state overrides marketplace `defaultEnabled`, then
+installed-manifest `defaultEnabled` (default true). Marketplace manifests are read
+only by a registered location and exact plugin name; their Skill trees are never
+scanned. Malformed state and ambiguous applicable versions are diagnosed and
+excluded. `CLAUDE_CODE_PLUGIN_CACHE_DIR` overrides the **plugins parent**, not only
+its cache. No host commands, installation or enablement mutations are performed.
+
 Boundaries and limitations:
 
 - Git repositories, worktrees and submodules use the nearest `.git` directory or
