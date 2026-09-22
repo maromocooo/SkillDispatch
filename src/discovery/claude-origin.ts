@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { SkillDescriptor } from "../core/types.js";
 
 export const claudeOrigins = [
@@ -65,4 +66,21 @@ export function invocationIdentity(value: string): string {
     .replace(/[\s\p{Cf}]/gu, "")
     .replace(/[‐‑‒–—−]/gu, "-")
     .toLowerCase();
+}
+
+/** Adapter-owned path-free digest consumed by the generic fingerprint helper. */
+export function claudeCatalogIdentity(skill: SkillDescriptor): string {
+  const metadata = claudeMetadata(skill);
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        metadata?.origin ?? "unknown",
+        metadata?.nativeInvocationName ?? null,
+        metadata?.pluginId ?? null,
+        metadata?.pluginVersion ?? null,
+        metadata?.installationScope ?? null,
+        metadata?.modelInvocable ?? false,
+      ]),
+    )
+    .digest("hex");
 }

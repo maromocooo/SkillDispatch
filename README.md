@@ -237,6 +237,23 @@ skills remain discoverable but cannot become routing/advisory candidates. Explic
 controlled by `enabledPlugins` instead. File-based managed settings and enterprise
 skill roots are supported read-only; MDM/server/session overrides are not inferred.
 
+Inspect the expanded catalog offline:
+
+```bash
+skilldispatch discover --agent claude-code
+skilldispatch discover --agent claude-code --json
+skilldispatch doctor --json
+```
+
+Discovery reports per-origin discovered/model-routable counts (`local-user`,
+`local-project`, `synced`, `plugin`, `managed`). JSON retains `skills`/`diagnostics`
+and adds `summary`; descriptions and paths remain local discovery data. Doctor
+shows counts only. Fingerprints add an adapter-generated path-free identity digest
+(origin, native name, plugin identity/version/scope, model eligibility). Cache and
+sync-directory relocation do not change it; plugin version/namespace changes do.
+Older Route Trace v1 records remain readable; the first expanded catalog naturally
+has a new fingerprint. No trace schema migration is needed.
+
 Boundaries and limitations:
 
 - Git repositories, worktrees and submodules use the nearest `.git` directory or

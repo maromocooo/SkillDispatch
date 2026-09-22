@@ -1,8 +1,13 @@
 import { basename, dirname, join, resolve } from "node:path";
+import type { Diagnostic } from "../core/types.js";
 import { finalizeCatalog } from "./catalog.js";
 import { claudeDiagnostic } from "./claude-files.js";
 import { parseClaudeBoolean } from "./claude-invocation.js";
-import { claudeMetadata, safeInvocationSegment } from "./claude-origin.js";
+import {
+  claudeCatalogIdentity,
+  claudeMetadata,
+  safeInvocationSegment,
+} from "./claude-origin.js";
 import { discoverPluginSkills } from "./claude-plugin-skills.js";
 import { resolveClaudePlugins } from "./claude-plugins.js";
 import {
@@ -40,7 +45,7 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       this.options.managedDirectory === undefined
         ? managedClaudeDirectory()
         : this.options.managedDirectory;
-    const diagnostics: import("../core/types.js").Diagnostic[] = [];
+    const diagnostics: Diagnostic[] = [];
     const settings = await loadClaudeCatalogSettings(
       context,
       configHome,
@@ -136,7 +141,9 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
           level: "warning",
           message:
             "Invalid disable-model-invocation value; skill excluded from routing.",
-          path: skill.path,
+          ...(origin?.origin === "plugin" || origin?.origin === "synced"
+            ? {}
+            : { path: skill.path }),
         });
       } else if (disabled) {
         skill.enabled = false;
@@ -148,6 +155,7 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       }
       (skill.metadata.claude as { modelInvocable: boolean }).modelInvocable =
         skill.enabled;
+      skill.metadata.catalogIdentity = claudeCatalogIdentity(skill);
     }
     return finalizeCatalog([result]);
   }

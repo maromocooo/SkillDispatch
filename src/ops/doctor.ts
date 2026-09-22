@@ -3,6 +3,7 @@ import { access, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { loadConfig } from "../config/load.js";
 import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
+import { claudeOriginCounts } from "../discovery/claude-origin.js";
 import { CodexDiscoveryAdapter } from "../discovery/codex.js";
 import { isMissing } from "../discovery/filesystem.js";
 import { validateApiKey } from "../providers/jev/options.js";
@@ -245,6 +246,19 @@ export async function runDoctor(
         `Discovered ${catalog.skills.length} skills, ${catalog.skills.filter((s) => s.enabled).length} enabled, ${catalog.diagnostics.length} diagnostics. Paths/messages withheld.`,
         catalog.skills.length,
       );
+      if (adapter.agent === "claude-code") {
+        for (const [origin, counts] of Object.entries(
+          claudeOriginCounts(catalog.skills),
+        )) {
+          if (counts.discovered)
+            add(
+              `claude_origin_${origin.replaceAll("-", "_")}`,
+              "PASS",
+              `${origin}: ${counts.discovered} discovered, ${counts.modelRoutable} model-routable.`,
+              counts.discovered,
+            );
+        }
+      }
     } catch {
       add(
         `discovery_${adapter.agent.replaceAll("-", "_")}`,
