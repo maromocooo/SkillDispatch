@@ -1,10 +1,10 @@
 # Architecture
 
-## Implemented PR4 boundary
+## Implemented PR5 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
 library and CLI entry points. Discovery, Jev/mock routing, routing evaluation,
-shadow hooks and local traces are active. Advisory/enforce behavior is deferred.
+shadow hooks, local traces, offline doctor and trace analytics are active. Advisory/enforce behavior is deferred.
 
 ```text
 cli/program + commands
@@ -19,6 +19,9 @@ cli/program + commands
        -> eval/metrics (pure scoring and aggregation)
   -> hooks/codex | hooks/claude -> hooks/runtime -> runtime/context + core/route
        -> telemetry/trace -> privacy + fingerprint -> JsonlTraceSink
+  -> ops/context -> trusted config + telemetry storage paths
+       -> telemetry/reader -> analytics + views -> traces CLI
+  -> ops/doctor -> config + discovery + read-only storage/schema checks
 ```
 
 `RouterProvider.judge` is the provider contract. Every eligible candidate must be
@@ -473,3 +476,77 @@ Future persistent cache key:
 - Hook adapter input is untrusted JSON.
 - Keep API keys only in the process environment (or an explicit library constructor
   argument); never in YAML, model input or diagnostics.
+
+## Operational CLI and trace analytics (PR5)
+
+`doctor` and `traces` use the same source-aware **hook** config policy as the runtime:
+defaults → user, with repository config only under user `hook.trustProjectConfig`.
+There is no explicit config override for these commands. Normal discover/route/eval
+layering remains unchanged. Reading project skills and trusting project runtime
+settings remain separate. `ops/context.ts` composes trusted config and existing
+`dataDirectory`/`tracePath` helpers without discovery or provider creation for traces.
+
+`TraceReader.read()` yields validated Route Trace v1 or line-number/safe-code
+errors. `JsonlTraceReader` checks reserved paths and canonical aliases, rejects
+symlink leaves, nonregular files and nlink != 1, checks POSIX owner/private modes
+on the file and parent leaf directory, and compares lstat identity with the
+no-follow/nonblocking opened descriptor. Earlier ancestor aliases follow the
+writer's convention; this is not a sandbox against same-user concurrent filesystem
+mutation. API keys have no on-disk mode; callers can also reserve credential files.
+Operational callers reserve the installation key and user configuration.
+
+Reads use 64 KiB blocks, at most 2 MiB line accumulation, fatal UTF-8 decoding, JSON
+parse and strict Zod schema validation. The starting file size bounds this read;
+concurrent appends are visible next time. A complete final object without LF is
+accepted; partial/corrupt/oversized/blank lines count as invalid and do not abort
+other records. Missing data is empty. Errors expose fixed text, not paths or parse
+excerpts. Readers never create, repair, chmod, rotate or delete files.
+
+`telemetry/views.ts` explicitly projects output and removes all prompt content,
+prompt hashes, sessionKey/promptKey and host objects, not merely `prompt.raw`.
+Show includes only the storage discriminator, policy, counts/fingerprint, safe
+routing metadata, scored decisions and diagnostic code/level. Skill IDs are also
+omitted from these CLI views. Schema-valid names/models/codes remain metadata,
+not a general secret detection/redaction mechanism. Text escapes control chars.
+No trace or SDK error is dumped directly. JSON uses an internal version-1 envelope;
+these ops APIs are not newly exposed from the package library entry point.
+
+`analytics.ts` streams matched records into aggregate counts/maps. File-health
+counts always cover all scanned lines; matchedTraces and metrics use only matching
+valid records. Summary reports outcome/host/provider counts, selected decision
+count mean (including failure/partial traces), exact nearest-rank P50/P95, distinct
+catalog fingerprints and per-version recommendation frequency. Empty averages
+and quantiles are null. Exact latency histograms cost O(unique latency values),
+skills O(unique name/agent/scope/contentHash tuples), catalogs O(unique fingerprints).
+Full trace bodies are not retained, but aggregate cardinalities are not bounded.
+
+A version is seen at most once per trace, selected if any equal-version decision
+was selected. Versions on different paths collapse only for this statistic;
+routing identities/catalogs remain unchanged. Never selected means observed but
+never recommended, excluding unobserved skills entirely. Sort: selected count
+desc, agent, name, scope, contentHash asc using compareText. The summary does not
+infer complete catalogs or skill invocation from decisions.
+
+List keeps bounded top-N safe views (default 20, maximum 1000), newest timestamp
+then UUID ascending, with later file records first for exact timestamp/ID ties.
+Show scans to EOF for an exact UUID, treating UUID case as equivalent, rejects
+multiple valid matches and returns no partial output on missing/duplicate IDs.
+Summary/list count duplicate records rather than building an unbounded UUID set.
+Agent/outcome filters and positive integer hour/day `--since` windows are local:
+since and now inclusive, future excluded only when a window is requested.
+
+Doctor never constructs a provider, authenticates online or mutates files. It
+reports command availability without claiming host registration. Existing key
+health checks permissions, regular single-link identity, readability and 32-byte
+size without exposing content or creating a missing key. Destination checks use
+permission probes and nearest existing writable ancestor for missing directories;
+these do not guarantee free space or durable writes. Config/unsafe storage/schema/
+discovery failures are FAIL (exit 1). Missing key/trace, missing Jev credential,
+empty/diagnostic-bearing discovery, disabled telemetry or invalid lines are WARN
+(exit 0 unless another check fails). Invalid credential format is FAIL. Mock needs
+no credentials. File locations for user config/data/trace are deliberately visible;
+absolute skill paths, diagnostic messages and correlation data are not.
+
+The historical PR4 contract remains unchanged. This stage supplies only local
+operational visibility: no context injection, invocation tracking, cloud upload,
+trace mutation or automatic optimization. See [PR5 validation](PR5_VALIDATION.md).

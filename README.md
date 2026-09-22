@@ -433,7 +433,7 @@ Claude inputs without `prompt_id` omit promptKey rather than inventing an ID.
 `host.sessionKey` is a separate HMAC of the session. Raw host IDs are never stored.
 
 The pre-release v1 schema replaces `turnKey` with `promptKey`; schemaVersion stays
-`1.0` because PR4 is not yet merged or publicly released. Old development traces
+`1.0`; this change was made before the first v1 release and before PR4 merged. Old development traces
 using turnKey do not validate against the revised schema.
 
 New directories/files use 0700/0600 on POSIX.
@@ -574,7 +574,8 @@ It is never run by `pnpm test` or CI automatically.
 Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
 HTTP in child processes. Format with `pnpm format`. See
-[PR4 validation](docs/PR4_VALIDATION.md) for hooks, traces and package checks,
+[PR5 validation](docs/PR5_VALIDATION.md) for operational commands and installed-package checks,
+[PR4 validation](docs/PR4_VALIDATION.md) for hooks and trace privacy,
 [PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
 Advisory/enforce modes, invocation detection, Studio and cloud trace services remain later work.
@@ -619,3 +620,40 @@ Doctor makes no API calls, creates no key/directories/files, changes no host
 settings and appends no traces. Writability is a permission probe, not a disk-space
 or durability guarantee. It never prints credential values, skill paths or
 diagnostic messages. Configuration/data/trace locations are shown intentionally.
+
+Trace reads are streaming with a 2 MiB per-line bound, using the opened file's
+initial byte size. New appends appear on the next command. An intact final JSON
+object without a newline is accepted; blank, truncated, invalid UTF-8/schema and
+oversized lines are invalid. No line contents or parser excerpts are printed.
+Missing files are empty datasets. Existing files must be private, owned regular
+files with one link; file/leaf-directory symlinks are rejected, as with the writer.
+The installation key and user config are reserved destinations, including parent
+aliases; SkillDispatch API credentials are environment-only, with no key-file mode.
+
+JSON counts `totalLines`, `validTraces` and `invalidLines` cover the scanned file;
+`matchedTraces` and all analytics cover valid records matching filters. Invalid
+lines cannot be assigned a host/time. Unfiltered reads include future timestamps.
+List/show exit 1 on invalid options or unsafe storage; otherwise trace commands
+exit 0 despite skipped corrupt lines. Duplicate *valid* IDs are rejected by show;
+summary/list count records independently, without a global UUID deduplication set.
+
+Skill statistics sort by selected count descending, then agent, name, scope and
+contentHash using locale-independent ordering. Text summary shows up to 20 versions;
+JSON includes all observed versions. Null means no observations for averages/P50/P95.
+Quantiles use the same exact nearest-rank definition as eval. Summary retains only
+frequency maps for latencies and skill versions plus distinct catalog fingerprints,
+not trace bodies; memory therefore grows with unique values. List retains at most
+its requested limit; show retains one redacted detail view. All commands scan the
+file, with no index, rotation, repair or deletion. These statistics describe router
+behavior, not skill usefulness or actual invocation.
+
+To repeat the installed package check offline after packing/installing in a
+temporary directory:
+
+```sh
+node scripts/trace-ops-smoke.mjs /path/to/install/node_modules/.bin/skilldispatch
+```
+
+This explicit development script uses temporary settings and denies fetch; it is
+not run by normal tests, CI or prepack. No online doctor or raw-prompt display
+option exists. Advisory remains deferred.
