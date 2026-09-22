@@ -8,12 +8,14 @@ import { fileURLToPath } from "node:url";
 import { auditTarball } from "./audit-tarball.mjs";
 
 const root = await mkdtemp(join(tmpdir(), "skilldispatch-release-install-"));
+let stage = "tarball audit";
 try {
   const tarball = resolve(process.argv[2]);
   const files = auditTarball(tarball);
   const env = { ...process.env };
   delete env.TYPESAFE_API_KEY;
   delete env.NODE_OPTIONS;
+  stage = "temporary package installation";
   const install = spawnSync(
     "pnpm",
     [
@@ -26,6 +28,14 @@ try {
     ],
     { env, encoding: "utf8", timeout: 120000 },
   );
+  if (install.status !== 0) {
+    const codes = new Set(
+      `${install.stdout ?? ""}\n${install.stderr ?? ""}`.match(
+        /\bERR_PNPM_[A-Z_]+\b/g,
+      ) ?? [],
+    );
+    for (const code of codes) console.error(`Package manager code: ${code}`);
+  }
   assert.equal(install.status, 0, "Temporary package installation failed");
   const cli = join(root, "node_modules/.bin/skilldispatch");
   for (const script of [
@@ -35,6 +45,7 @@ try {
     "claude-catalog-smoke",
     "claude-invocation-smoke",
   ]) {
+    stage = script;
     const run = spawnSync(
       process.execPath,
       [fileURLToPath(new URL(`./${script}.mjs`, import.meta.url)), cli],
@@ -43,6 +54,7 @@ try {
     assert.equal(run.status, 0, `Installed ${script} failed`);
     process.stdout.write(run.stdout);
   }
+  stage = "installed public mock demo";
   const demo = spawnSync(
     process.execPath,
     [join(root, "node_modules/skilldispatch/examples/demo/run.mjs")],
@@ -54,12 +66,14 @@ try {
       demo.stdout.includes("react-components"),
   );
   assert.ok(!demo.stdout.includes(root) && !demo.stdout.includes("SKILL.md"));
+  stage = "installed CLI version";
   const version = spawnSync(cli, ["--version"], {
     env,
     encoding: "utf8",
     timeout: 10000,
   });
   assert.equal(version.stdout.trim(), "0.1.0");
+  stage = "installed public ESM API";
   const api = spawnSync(
     process.execPath,
     [
@@ -75,7 +89,7 @@ try {
   );
 } catch {
   console.error(
-    "Release package smoke failed; no raw child output is exposed.",
+    `Release package smoke failed at ${stage}; no raw child output is exposed.`,
   );
   process.exitCode = 1;
 } finally {
