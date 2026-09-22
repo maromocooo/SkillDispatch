@@ -33,7 +33,11 @@ try {
     ".codex/hooks.json",
     ".claude/settings.json",
   ].map((path) => join(cwd, path));
-  for (const path of projectPaths) await write(path, "PROJECT_SENTINEL");
+  const projectSentinel = (path) =>
+    path.endsWith("settings.json")
+      ? '{"fixtureSentinel":"PROJECT_SENTINEL"}'
+      : "PROJECT_SENTINEL";
+  for (const path of projectPaths) await write(path, projectSentinel(path));
   await write(
     join(home, ".config/skilldispatch/config.yaml"),
     "router:\n  provider: mock\n",
@@ -57,6 +61,7 @@ try {
   delete env.TYPESAFE_API_KEY;
   delete env.CODEX_HOME;
   delete env.CLAUDE_CONFIG_DIR;
+  delete env.CLAUDE_CODE_PLUGIN_CACHE_DIR;
   const invoke = (command, args, input) => {
     const result = spawnSync(command, args, {
       cwd,
@@ -173,7 +178,7 @@ try {
   }
   assert.equal(JSON.parse(run(["traces", "summary", "--json"])).validTraces, 2);
   for (const path of projectPaths)
-    assert.equal(await readFile(path, "utf8"), "PROJECT_SENTINEL");
+    assert.equal(await readFile(path, "utf8"), projectSentinel(path));
   assert.ok(!(await readdir(root)).includes("network-attempt"));
   console.log(
     `PASS ${process.version}: installed registration status/install/uninstall/dry-run/sync; generated Codex and Claude commands -> silent exit 0 + two mock traces; backup/settings preserved; no project/real-user mutation or external fetch`,

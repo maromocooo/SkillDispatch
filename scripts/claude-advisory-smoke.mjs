@@ -41,7 +41,10 @@ try {
     join(cwd, ".claude/skills/swift-concurrency-expert/SKILL.md"),
     "---\nname: display-swift\ndescription: PRIVATE_DESCRIPTION\n---\nPRIVATE_BODY",
   );
-  await write(join(cwd, ".claude/settings.json"), "PROJECT_SENTINEL");
+  await write(
+    join(cwd, ".claude/settings.json"),
+    '{"fixtureSentinel":"PROJECT_SENTINEL"}',
+  );
   await write(
     join(cwd, ".skilldispatch.yaml"),
     "hook: {modes: {claude: advisory}}",
@@ -63,6 +66,7 @@ try {
   delete env.TYPESAFE_API_KEY;
   delete env.CODEX_HOME;
   delete env.CLAUDE_CONFIG_DIR;
+  delete env.CLAUDE_CODE_PLUGIN_CACHE_DIR;
   const invoke = (command, args, input) => {
     const result = spawnSync(command, args, {
       cwd,
@@ -170,7 +174,7 @@ try {
   );
   assert.equal(
     await readFile(join(cwd, ".claude/settings.json"), "utf8"),
-    "PROJECT_SENTINEL",
+    '{"fixtureSentinel":"PROJECT_SENTINEL"}',
   );
   assert.ok(!(await readdir(root)).includes("NETWORK_ATTEMPT"));
   console.log(

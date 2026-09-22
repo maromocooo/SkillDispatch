@@ -49,6 +49,7 @@ try {
     ...process.env,
     SKILLDISPATCH_DATA_DIR: data,
     CLAUDE_CONFIG_DIR: join(home, ".claude"),
+    CLAUDE_CODE_PLUGIN_CACHE_DIR: join(home, ".claude/plugins"),
     PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ""}`,
     NODE_OPTIONS: `--import=${preload}`,
   };
