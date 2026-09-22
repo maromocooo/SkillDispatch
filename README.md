@@ -6,7 +6,7 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR7 development preview: discovery, routing, evaluation, private local
+**Status:** PR8 development preview: discovery, routing, evaluation, private local
 traces, operational CLI, user hook registration, and explicit **Claude advisory**.
 Both hosts default to shadow. Codex remains shadow-only. Real Jev routing quality
 has not been established; native skill invocation is not observed.
@@ -78,12 +78,14 @@ skilldispatch traces show <trace-id> --json
 From a source checkout, replace `skilldispatch` with `pnpm skilldispatch` or
 `node dist/cli/index.js`. For scripts that need pure JSON, prefer the latter.
 
-`discover --json` returns `{ skills, diagnostics }`, including disabled skills.
+`discover --json` returns `{ skills, diagnostics, summary }`, including disabled skills.
 Text mode prints name, agent, scope, enabled state, and canonical path, with
 diagnostics on stderr. Distinct paths with the same name remain separate skills.
 Routing supports skills from multiple host agents. Same-name skills from different
 agents are distinct and are not duplicate-name conflicts. `duplicate_name` groups
-only the same agent and whitespace-normalized name (case-sensitive).
+only the same agent and whitespace-normalized name (case-sensitive) for generic/Codex skills.
+Claude uses normalized native invocation identity: distinct plugin namespaces do
+not conflict just because their display names match.
 
 `route --json` returns `selected`, `allDecisions`, `router`, `policy`, and
 `diagnostics`. Decisions include IDs, names, paths, probabilities and selection
@@ -185,7 +187,7 @@ existing behavior and never write telemetry, even when it is enabled.
 
 ## Discovery behavior and current host differences
 
-Official documentation checked on 2026-09-21:
+Codex references were checked on 2026-09-21; Claude references were rechecked for PR8 on 2026-09-22:
 
 - [Codex skills](https://learn.chatgpt.com/docs/build-skills): scans `.agents/skills`
   from CWD to the repository root, plus `~/.agents/skills` and `/etc/codex/skills`.
@@ -219,18 +221,21 @@ public local active-account selector, so SkillDispatch does not guess a winner.
 Identical duplicate versions collapse; differing content stays visible for review.
 This is an offline cache snapshot, not proof of current account/session availability.
 
-Plugin state resolution uses only version-2 `installed_plugins.json` records and
-installed manifests. `enabledPlugins` merges user → CWD project → local → file
-managed settings. Explicit state overrides marketplace `defaultEnabled`, then
+Plugin state resolution requires version-2 `installed_plugins.json` records and
+a valid installed manifest or registered marketplace definition (`strict: false`).
+`enabledPlugins` merges user → CWD project → local → file managed settings. Explicit state overrides marketplace `defaultEnabled`, then
 installed-manifest `defaultEnabled` (default true). Marketplace manifests are read
 only by a registered location and exact plugin name; their Skill trees are never
 scanned. Malformed state and ambiguous applicable versions are diagnosed and
 excluded. `CLAUDE_CODE_PLUGIN_CACHE_DIR` overrides the **plugins parent**, not only
-its cache. No host commands, installation or enablement mutations are performed.
+its cache. With `strict: false`, the marketplace entry owns the definition; an
+installed manifest that also declares components is a conflict. Marketplace-root
+plugins must declare their skill subset; missing paths never trigger a broader scan.
+No host commands, installation or enablement mutations are performed.
 
 Active plugin skills load only from registry installation roots (`skills/` and safe
-manifest/marketplace-declared skill directories and single-skill roots), with `plugin-name:<frontmatter-name>` or a
-directory-name fallback, per current Claude docs. Personal/project names still use
+manifest/marketplace-declared skill directories and single-skill roots), with
+`plugin-name:<frontmatter-name>` or a directory-name fallback, per current Claude docs. Personal/project names still use
 the directory. `metadata.claude` records origin separately from scope. Manual-only
 skills remain discoverable but cannot become routing/advisory candidates. Explicit
 `skillOverrides` restrictions apply to non-plugin skills; plugin enablement is
@@ -269,9 +274,9 @@ Boundaries and limitations:
   limited to regular files of at most 1 MiB. Invalid files and traversal failures become diagnostics.
 - Codex system roots are explicit library options because installation paths
   vary. Plugin caches and old repository `.codex/skills` are not guessed.
-- PR1 does not reproduce session state, repository trust, managed restrictions,
+- Discovery does not reproduce live session state, repository trust, non-file managed restrictions,
   CLI/session setting overrides, legacy commands, `--add-dir`,
-  or skills activated later by file access. It is a local catalog, not telemetry
+  bundled skills, skills-directory plugins, or skills activated later by file access. It is a local catalog, not telemetry
   of which skills a host actually loaded or invoked.
 - Only Codex user TOML disable entries are read; project/managed config layering
   is deferred. Malformed config yields diagnostics; known explicit-only skills
@@ -734,8 +739,10 @@ tests/
   cli/          Command output, filtering, multi-skill routing and errors
 ```
 
-IDs hash `agent + canonical path`; content hashes use the original file text.
-Renaming/moving a file changes its ID; editing content changes only its hash.
+Local skill IDs hash `agent + canonical path`; content hashes use the original file
+text. Renaming a local file changes its ID. Synced/plugin IDs instead hash logical
+source identity and content: moving a cache/account directory alone preserves IDs,
+while plugin version or content changes produce a new version identity.
 Core imports no agent adapter or SDK. Providers receive IDs, names, descriptions,
 scopes and each candidate's host agent, never skill bodies or arbitrary frontmatter.
 `ProviderRouteOutput.completeness` is required:
@@ -790,6 +797,8 @@ HTTP in child processes. Format with `pnpm format`. See
 [PR5 validation](docs/PR5_VALIDATION.md) for trace operations,
 [PR6 validation](docs/PR6_VALIDATION.md) for registration management,
 [PR7 validation](docs/PR7_VALIDATION.md) for Claude advisory safety and installed-package checks,
+[PR8 validation](docs/PR8_VALIDATION.md) for native catalog sources, official naming differences,
+conservative resolution and package checks,
 [PR4 validation](docs/PR4_VALIDATION.md) for hooks and trace privacy,
 [PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.

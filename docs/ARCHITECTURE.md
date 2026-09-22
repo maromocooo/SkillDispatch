@@ -1,11 +1,12 @@
 # Architecture
 
-## Implemented PR7 boundary
+## Implemented PR8 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
 library and CLI entry points. Discovery, Jev/mock routing, routing evaluation,
 shadow hooks, local traces, offline doctor, trace analytics and user hook registration
-are active. Claude advisory is user opt-in; Codex stays shadow-only. Enforce and
+are active. Claude discovery includes explicit synced and active installed-plugin sources.
+Claude advisory is user opt-in; Codex stays shadow-only. Enforce and
 subagent routing are not implemented.
 
 ```text
@@ -37,9 +38,11 @@ Malformed results fail open; valid partial results preserve successes. An overal
 timeout uses an abort signal; Jev cancels in-flight requests through its safe
 transport and stops scheduling additional chunks.
 
-Discovery normalizes canonical paths, hashes agent/path identity independently
-of content, and retains same-name skills. Duplicate-name diagnostics group by
-agent and whitespace-normalized name (case-sensitive), not name alone. Skills
+Discovery normalizes canonical paths and retains same-name local skills. Local
+IDs hash agent/path; synced/plugin IDs use adapter-owned logical identity and
+content to avoid cache-path churn. Duplicate-name diagnostics group by agent and
+whitespace-normalized name (case-sensitive) for generic/Codex skills; Claude uses
+normalized native invocation identity, including namespace. Skills
 belonging to different host agents are distinct even when their names match.
 Host-specific fallback fields and invocation restrictions stay in adapters.
 Generic parsing and traversal do not
@@ -53,8 +56,8 @@ write the new public Route Trace v1 contract; prompt storage defaults to HMAC.
 
 Configuration accepts `jev` (default) or explicit `mock`. Unsupported providers
 error; unknown config fields warn. Eval input uses its own strict versioned schema.
-Telemetry configuration is hook-only; no mode option or context-injection path
-is accepted. Shared composition selects the same provider/policy for all commands.
+Telemetry configuration is hook-only; advisory mode is an explicit user-owned
+Claude hook option. Shared composition selects the same provider/policy for all commands.
 
 See [README](../README.md) for supported paths, current host differences,
 configuration precedence and known discovery boundaries.
@@ -429,7 +432,11 @@ uses `compareText`, retains multiplicity, and is independent of input order,
 locale, absolute paths and path-derived IDs. Names remain case-sensitive. Content
 or enabled changes affect the fingerprint; moving otherwise identical skills does
 not. This enables semantic catalog comparison across installations, while each
-trace decision's existing skill ID remains a local identity.
+trace decision's existing skill ID remains a catalog identity. PR8 optionally
+appends an adapter-generated 64-hex `catalogIdentity` digest to Claude tuples.
+It commits to origin, native name, plugin identity/version/installation scope and
+model eligibility, without passing Claude-specific types into the fingerprint layer.
+Legacy traces require no rewrite; expanded catalogs naturally have new fingerprints.
 
 ### JSONL persistence
 
@@ -632,15 +639,14 @@ registration, configured advisory, no conflict/disable issue. Async/unknown stat
 gets `advisory_registration_not_ready` and no output. Current file state is not proof
 that a running host reloaded settings; host lifecycle remains external.
 
-`discovery/claude-invocation.ts` derives identifiers from direct personal/project
-source entries, including the local symlink entry, rather than canonical target or
-frontmatter display names. Source-root/nested/plugin entries without this provenance
-are omitted. Only a bounded letters/numbers/marks/underscore/ASCII-hyphen identifier
-is accepted. Counts include disabled catalog entries; multiple matches cause
+`discovery/claude-invocation.ts` validates adapter-owned native identifiers. Local
+skills retain source-entry names (including symlinks) rather than canonical-target
+or frontmatter display names. PR8 supplies synced/plugin namespaces as described
+below. Only bounded safe identifier segments are accepted. Counts include disabled
+entries; multiple normalized native matches cause
 `advisory_ambiguous_skill_invocation`. No approximate native precedence is applied.
-Disabled/manual-only/invalid policy is independently checked in the builder. Current
-managed/runtime `skillOverrides` and availability are not fully discovered: native
-host permissions remain authoritative, and unsupported sources are not inferred.
+The builder independently checks manual-only and model eligibility restrictions.
+Native session permissions and availability remain authoritative.
 
 The pure builder projects only identifiers, retaining selection order. Static text
 prioritizes the user's request, asks to consider native Skill invocation if permitted
@@ -667,3 +673,82 @@ issue and reinstall guidance, and doctor WARNs. `advisory_ready` requires config
 advisory, sync registration without issues and `routing_ready`; shadow reports false
 without implying an installation failure. Status/doctor never reconcile automatically.
 Atomic mutation, private backup, exact ownership and offline behavior remain intact.
+
+## Claude native catalog (PR8)
+
+All new discovery is read-only and offline. The adapter resolves `CLAUDE_CONFIG_DIR`
+(default home/.claude), and `CLAUDE_CODE_PLUGIN_CACHE_DIR` (default configRoot/plugins,
+**the parent of cache**, also containing registry state). No `claude` subprocess,
+authentication, marketplace walk, plugin installation or host mutation is involved.
+The SkillDispatch hook project-config trust boundary remains separate: Claude
+project settings describe native catalog eligibility, never SkillDispatch telemetry,
+provider selection or advisory mode.
+
+The adapter pipeline is:
+
+1. `claude-settings`: bounded reads of user, CWD project, CWD legacy local,
+   owned repository-root local settings (macOS/Linux), then file-managed base and
+   ordered fragments. Per-key plugin enablement and non-plugin invocation overrides
+   merge at this boundary; malformed relevant state makes candidates non-routable.
+2. Existing direct personal/project traversal, plus file-managed enterprise skills.
+   A local directory containing a plugin manifest is marked unsupported instead of
+   being mislabeled as an unqualified native command.
+3. `claude-synced`: explicit account-directory then direct skill-directory scans.
+   Synced name collisions across accounts are non-routable, not resolved by mtime.
+   Identical duplicate versions collapse; different content remains visible.
+4. `claude-plugins`: version-2 registry, project applicability, targeted marketplace
+   metadata and effective installed definition. Explicit `enabledPlugins` wins over
+   entry default, then manifest default, then true. Valid registry membership alone
+   is insufficient. Multiple applicable versions are ambiguous and excluded.
+5. `claude-plugin-skills`: default/declarative skill roots inside the resolved install
+   path. Equivalent same-version copies collapse after content comparison; differing
+   copies are excluded. No recursive cache or marketplace skill enumeration.
+6. Apply frontmatter model restrictions, non-plugin `skillOverrides`, origin metadata,
+   deterministic final ordering and native-identity duplicate diagnostics.
+
+Plugin `strict: true` uses installed manifest metadata, with additional declared
+marketplace components. `strict: false` uses the marketplace entry, rejects a second
+component-bearing manifest, and permits no installed manifest. Marketplace-root
+entries use only their explicit component subset. SkillDispatch deliberately does
+not reproduce the host's fallback-to-full-scan when all declared paths are missing.
+Single-skill roots and custom skill directories are supported; executable components
+and arbitrary includes are never evaluated.
+
+`metadata.claude` owns `origin`, `nativeInvocationName`, `modelInvocable`, and optional
+plugin ID/name/version/installation scope. Frontmatter cannot spoof this provenance.
+Core `scope` stays repo/user/admin/system/unknown; project/local plugins map to repo,
+managed to admin. Origin describes source, scope describes applicability. `enabled`
+and `modelInvocable` mean eligible for model routing, not installed/enabled plugin
+state or whether a human can explicitly run a skill. Disabled plugins are excluded;
+manual-only skills from active sources remain visible but are not provider candidates.
+
+Native identifiers follow current official naming: local directory name; synced
+`anthropic-skills:<name>`; plugin manifest name plus frontmatter skill name (directory
+fallback, already-qualified prefix preserved once). Namespace components are validated
+before advisory. Local/synced collisions can coexist via the explicit synced namespace.
+Local enterprise/personal/project collisions retain distinct paths and advisory refuses
+ambiguous invocation rather than guessing native precedence.
+
+JSON state reads are strict, bounded to 1 MiB/depth 32, reject duplicate keys, invalid
+UTF-8, leaf/parent symlinks and non-regular or multiply-linked files. Registry limits
+are 1024 plugin IDs and 256 records per ID; known directory enumeration is bounded to
+256 entries. Existing skill reads retain 1 MiB limits and traversal bounds. New synced
+and plugin scans reject symlinks. Source errors emit fixed codes/messages without raw
+content or paths; ordinary local discovery JSON still exposes the existing descriptor
+paths/descriptions by design. Provider requests and advisory never receive the new
+state, installation paths, account directory names, plugin versions or full bodies.
+
+`discover` adds optional summary/origin counts without removing JSON fields; doctor
+reports counts and safe diagnostics. Discovery diagnostics yield WARN in doctor, not
+proof of host/UI parity. Existing Route Trace v1 and analytics shapes are unchanged.
+Fingerprints add logical identity as described above; historical per-skill analytics
+still groups by name/agent/scope/contentHash and cannot reconstruct namespaces from
+old trace snapshots.
+
+This is a filesystem snapshot, not a native session catalog API. Active login/account,
+MDM/server policy, session flags, worktree-main-checkout local settings, additional-dir
+runtime loads, nested lazy skills, bundled commands, legacy commands, plugin seed/cloud
+state, and skills-directory plugin trust are not inferred. Unknown registry versions,
+ambiguous cached accounts/installations and unsafe sources have conservative diagnostics.
+See [PR8 validation](PR8_VALIDATION.md) for official sources, tested assumptions,
+known host differences and reproducible checks.
