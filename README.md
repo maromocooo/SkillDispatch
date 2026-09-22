@@ -21,7 +21,7 @@ installation below until the first release. Node.js 20+; MIT licensed.
 As catalogs grow, broad descriptions overlap and skill selection gets harder to
 inspect. SkillDispatch separates discovery, routing policy, host delivery and
 observation so you can test descriptions and inspect behavior. It does not replace
-native skill invocation or require a dashboard, account, database or Studio.
+native skill invocation or require a dashboard, database or Studio.
 
 ## How it works
 
