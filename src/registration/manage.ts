@@ -3,6 +3,7 @@ import { resolveExecution, shadowCommand } from "./command.js";
 import { ownsHandler, planDocument, possibleOtherInstall } from "./document.js";
 import { MAX_HOST_CONFIG_BYTES, unchanged } from "./files.js";
 import { checkCodexInline, loadRegistration } from "./inspect.js";
+import { registrationMode } from "./mode.js";
 import {
   type CliExecution,
   type Host,
@@ -19,6 +20,12 @@ export async function manageRegistration(
   write = atomicRegistrationWrite,
 ) {
   try {
+    if (host === "codex" && action === "install" && options.sync)
+      throw new RegistrationError("codex_sync_not_supported");
+    const mode =
+      action === "install" ? await registrationMode(host, environment) : null;
+    const sync =
+      mode === "advisory" || (host === "claude" && options.sync === true);
     const resolved = await resolveExecution(execution);
     const command = shadowCommand(host, resolved);
     const prepare = async () => {
@@ -52,7 +59,7 @@ export async function manageRegistration(
         throw new RegistrationError(
           "modified_registration_manual_action_required",
         );
-      const plan = planDocument(loaded.document, command, action, options.sync);
+      const plan = planDocument(loaded.document, command, action, sync);
       if (Buffer.byteLength(plan.text) > MAX_HOST_CONFIG_BYTES)
         throw new RegistrationError("config_too_large");
       return { ...loaded, plan };
@@ -78,11 +85,11 @@ export async function manageRegistration(
     return {
       version: 1 as const,
       host,
+      mode,
       action: planned.plan.action,
       dryRun: options.dryRun === true,
       changed: changed() && !options.dryRun,
-      execution:
-        action === "install" ? (options.sync ? "sync" : "async") : null,
+      execution: action === "install" ? (sync ? "sync" : "async") : null,
       command,
       configSource: planned.paths.config,
       backup:

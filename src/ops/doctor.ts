@@ -8,7 +8,11 @@ import { isMissing } from "../discovery/filesystem.js";
 import { validateApiKey } from "../providers/jev/options.js";
 import { resolveExecution } from "../registration/command.js";
 import { inspectRegistration } from "../registration/inspect.js";
-import { type CliExecution, hosts } from "../registration/types.js";
+import {
+  type CliExecution,
+  type HookStatus,
+  hosts,
+} from "../registration/types.js";
 import type { RuntimeEnvironment } from "../runtime/context.js";
 import {
   assertTraceDestination,
@@ -102,14 +106,16 @@ export async function runDoctor(
       /* Report unavailable identity below. */
     }
   }
+  let claudeRegistration: HookStatus | undefined;
   for (const host of hosts) {
     const registration = await inspectRegistration(host, environment, resolved);
+    if (host === "claude") claudeRegistration = registration;
     add(
       `hook_${host}`,
       registration.registration === "installed" && !registration.issues.length
         ? "PASS"
         : "WARN",
-      `${host} shadow hook: ${registration.registration}${registration.execution ? ` (${registration.execution})` : ""}. User layer only.${registration.issues.length ? ` Issues: ${registration.issues.join(", ")}.` : ""}`,
+      `${host} ${registration.mode ?? "unknown"} hook: ${registration.registration}${registration.execution ? ` (${registration.execution})` : ""}. User layer only.${registration.issues.length ? ` Issues: ${registration.issues.join(", ")}.` : ""}`,
       registration.registration,
     );
   }
@@ -150,8 +156,8 @@ export async function runDoctor(
     "telemetry",
     config.telemetry.enabled ? "PASS" : "WARN",
     config.telemetry.enabled
-      ? "Shadow hook routing and persistence enabled."
-      : "Shadow hook routing and persistence disabled by configuration.",
+      ? "Hook routing and persistence enabled."
+      : "Hook routing and persistence disabled by configuration.",
   );
   add(
     "provider",
@@ -194,8 +200,38 @@ export async function runDoctor(
   add(
     "routing_ready",
     routingReady ? "PASS" : "WARN",
-    "Local shadow routing prerequisites only; does not verify online authentication, host registration/trust or delivery.",
+    "Local routing prerequisites only; does not verify online authentication, host registration/trust or delivery.",
     routingReady,
+  );
+  const claudeMode = config.hook.modes.claude;
+  const executionMatches =
+    claudeRegistration?.registration === "installed" &&
+    claudeRegistration.execution ===
+      (claudeMode === "advisory" ? "sync" : "async") &&
+    !claudeRegistration.issues.length;
+  add(
+    "hook_mode_claude",
+    "PASS",
+    "Claude execution mode is owned by user configuration.",
+    claudeMode,
+  );
+  add(
+    "hook_execution_claude",
+    executionMatches ? "PASS" : "WARN",
+    executionMatches
+      ? "Claude registration matches configured mode."
+      : "Re-run: skilldispatch hooks install claude. Reload host hooks after reconciling.",
+    claudeRegistration?.execution ?? "not-installed",
+  );
+  const advisoryReady =
+    claudeMode === "advisory" && executionMatches && routingReady;
+  add(
+    "advisory_ready",
+    claudeMode === "shadow" || advisoryReady ? "PASS" : "WARN",
+    claudeMode === "shadow"
+      ? "Claude advisory is disabled (shadow mode)."
+      : "Local advisory prerequisites only; native skill availability, host reload and online authentication are not verified.",
+    advisoryReady,
   );
   for (const adapter of [
     new CodexDiscoveryAdapter(),

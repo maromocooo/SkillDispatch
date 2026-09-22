@@ -34,11 +34,15 @@ export async function hooksStatus(
   else
     for (const status of statuses) {
       io.stdout(
-        `${status.host}\t${status.registration}\t${status.execution ?? "-"}\nConfig source: ${status.configSource}\n`,
+        `${status.host}\tmode: ${status.mode ?? "unknown"}\t${status.registration}\t${status.execution ?? "-"}\nConfig source: ${status.configSource}\n`,
       );
       if (status.command)
         io.stdout(
           `Command: ${terminalText(status.command.command)}${status.command.args ? ` ${terminalText(JSON.stringify(status.command.args))}` : ""}\n`,
+        );
+      if (status.issues.includes("hook_execution_mismatch"))
+        io.stdout(
+          `Configured ${status.mode} requires ${status.expectedExecution}. Re-run: skilldispatch hooks install ${status.host}\n`,
         );
       io.stdout(
         `Issues: ${status.issues.length ? status.issues.join(", ") : "none"}\n`,
@@ -83,7 +87,9 @@ export async function hooksMutation(
         "Review and trust this registration in Codex /hooks; registration is not host approval.\n",
       );
     io.stdout(
-      "Shadow only. Async delivery depends on host lifetime; missing trace does not mean no skill was selected.\n",
+      result.mode === "advisory"
+        ? "Claude advisory: synchronous same-turn recommendations. Reload host hooks after changing registration.\n"
+        : "Shadow only. Async delivery depends on host lifetime; missing trace does not mean no skill was selected.\n",
     );
   }
 }

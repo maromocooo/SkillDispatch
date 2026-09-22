@@ -15,6 +15,8 @@ export interface CommandSpec {
 }
 export interface HookStatus {
   host: Host;
+  mode: "shadow" | "advisory" | null;
+  expectedExecution: "async" | "sync" | null;
   registration: "installed" | "not-installed" | "conflict";
   execution: "async" | "sync" | "mixed" | null;
   command: CommandSpec | null;

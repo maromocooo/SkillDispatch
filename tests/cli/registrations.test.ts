@@ -54,6 +54,8 @@ describe("hooks CLI", () => {
       hosts: [
         {
           host: "codex",
+          mode: "shadow",
+          expectedExecution: "async",
           registration: "not-installed",
           execution: null,
           command: null,
@@ -63,6 +65,8 @@ describe("hooks CLI", () => {
         },
         {
           host: "claude",
+          mode: "shadow",
+          expectedExecution: "async",
           registration: "not-installed",
           execution: null,
           command: null,
@@ -92,13 +96,27 @@ describe("hooks CLI", () => {
         JSON.parse((await run(["hooks", "status", host, "--json"], ctx)).stdout)
           .hosts[0].registration,
       ).toBe("not-installed");
+      if (host === "codex")
+        expect(
+          (await run(["hooks", "install", host, "--sync"], ctx)).exit,
+        ).toBe(1);
       expect(
-        (await run(["hooks", "install", host, "--sync"], ctx)).stdout,
-      ).toContain("(sync)");
+        (
+          await run(
+            [
+              "hooks",
+              "install",
+              host,
+              ...(host === "claude" ? ["--sync"] : []),
+            ],
+            ctx,
+          )
+        ).stdout,
+      ).toContain(host === "claude" ? "(sync)" : "(async)");
       expect(
         JSON.parse((await run(["hooks", "status", host, "--json"], ctx)).stdout)
           .hosts[0].execution,
-      ).toBe("sync");
+      ).toBe(host === "claude" ? "sync" : "async");
       expect(
         (await run(["hooks", "uninstall", host, "--dry-run"], ctx)).stdout,
       ).toContain("Dry run");

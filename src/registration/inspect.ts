@@ -3,6 +3,7 @@ import { parse as parseToml } from "smol-toml";
 import { shadowCommand } from "./command.js";
 import { HookDocument, ownsHandler, possibleOtherInstall } from "./document.js";
 import { readHostFile } from "./files.js";
+import { registrationMode } from "./mode.js";
 import {
   type CliExecution,
   type HookStatus,
@@ -67,6 +68,8 @@ export async function inspectRegistration(
 ): Promise<HookStatus> {
   const status: HookStatus = {
     host,
+    mode: null,
+    expectedExecution: null,
     registration: "not-installed",
     execution: null,
     command: null,
@@ -76,6 +79,8 @@ export async function inspectRegistration(
     registrations: 0,
   };
   try {
+    status.mode = await registrationMode(host, environment);
+    status.expectedExecution = status.mode === "advisory" ? "sync" : "async";
     const { document } = await loadRegistration(host, environment);
     if (!execution) throw new RegistrationError("cli_identity_unavailable");
     const command = shadowCommand(host, execution);
@@ -114,6 +119,8 @@ export async function inspectRegistration(
     if (status.issues.length) status.registration = "conflict";
     if (host === "claude" && document.node(["disableAllHooks"])?.value === true)
       status.issues.push("host_hooks_disabled");
+    if (matching.length && status.execution !== status.expectedExecution)
+      status.issues.push("hook_execution_mismatch");
     if (host === "codex" && matching.length)
       status.issues.push("codex_host_trust_not_verified");
   } catch (error) {

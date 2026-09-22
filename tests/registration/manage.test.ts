@@ -64,12 +64,17 @@ describe.each(["codex", "claude"] as const)(
         await expect(
           lstat(`${ctx.path}.skilldispatch.bak`),
         ).rejects.toMatchObject({ code: "ENOENT" });
-        expect((await ctx.manage("install", { sync: true })).action).toBe(
-          "update",
-        );
+        if (host === "codex")
+          await expect(ctx.manage("install", { sync: true })).rejects.toThrow(
+            "codex_sync_not_supported",
+          );
+        else
+          expect((await ctx.manage("install", { sync: true })).action).toBe(
+            "update",
+          );
         expect(
           (await inspectRegistration(host, ctx, ctx.execution)).execution,
-        ).toBe("sync");
+        ).toBe(host === "claude" ? "sync" : "async");
         expect((await ctx.manage("uninstall")).action).toBe("uninstall");
         expect(
           new HookDocument(await readFile(ctx.path, "utf8")).handlers(),
@@ -108,7 +113,7 @@ describe.each(["codex", "claude"] as const)(
           (await lstat(`${ctx.path}.skilldispatch.bak`)).mode & 0o777,
         ).toBe(0o600);
       }
-      await ctx.manage("install", { sync: true });
+      await ctx.manage("install", { sync: host === "claude" });
       await ctx.manage("uninstall");
       expect(JSON.parse(await readFile(ctx.path, "utf8"))).toEqual(before);
       expect(await readFile(`${ctx.path}.skilldispatch.bak`, "utf8")).toBe(
