@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "totalLines": 5,
+  "validTraces": 4,
+  "invalidLines": 1,
+  "matchedTraces": 4,
+  "traces": [
+    {
+      "traceId": "00000000-0000-4000-8000-000000000004",
+      "timestamp": "2000-01-02T03:04:08.678Z",
+      "agent": "claude-code",
+      "outcome": "failed",
+      "mode": "advisory",
+      "injectedCount": 0,
+      "provider": "mock",
+      "model": "synthetic-model",
+      "selectedCount": 0,
+      "latencyMs": 41
+    },
+    {
+      "traceId": "00000000-0000-4000-8000-000000000003",
+      "timestamp": "2000-01-02T03:04:07.678Z",
+      "agent": "claude-code",
+      "outcome": "partial",
+      "mode": "advisory",
+      "injectedCount": 0,
+      "provider": "mock",
+      "model": "synthetic-model",
+      "selectedCount": 1,
+      "latencyMs": 30.75
+    },
+    {
+      "traceId": "00000000-0000-4000-8000-000000000002",
+      "timestamp": "2000-01-02T03:04:06.678Z",
+      "agent": "claude-code",
+      "outcome": "complete",
+      "mode": "advisory",
+      "injectedCount": 0,
+      "provider": "mock",
+      "model": "synthetic-model",
+      "selectedCount": 0,
+      "latencyMs": 20.5
+    },
+    {
+      "traceId": "00000000-0000-4000-8000-000000000001",
+      "timestamp": "2000-01-02T03:04:05.678Z",
+      "agent": "claude-code",
+      "outcome": "complete",
+      "mode": "advisory",
+      "injectedCount": 1,
+      "provider": "mock",
+      "model": "synthetic-model",
+      "selectedCount": 2,
+      "latencyMs": 842.48
+    }
+  ]
+}

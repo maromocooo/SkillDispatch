@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "totalLines": 5,
+  "validTraces": 4,
+  "invalidLines": 1,
+  "matchedTraces": 4,
+  "agents": {
+    "codex": 0,
+    "claude-code": 4
+  },
+  "outcomes": {
+    "complete": 2,
+    "partial": 1,
+    "failed": 1
+  },
+  "modes": {
+    "shadow": 0,
+    "advisory": 4
+  },
+  "advisory": {
+    "recommendedCount": 3,
+    "injectedCount": 1
+  },
+  "advisoryFunnel": {
+    "recommended": 3,
+    "injected": 1,
+    "observedModelInvoked": 1,
+    "observedSucceeded": 1,
+    "injectedPairsWithoutObservedInvocation": 0,
+    "telemetryConfiguredTraces": 4,
+    "telemetryUnconfiguredTraces": 0,
+    "uncorrelatableTraces": 0,
+    "uncorrelatablePairs": 0,
+    "skills": [
+      {
+        "recommended": 2,
+        "injected": 1,
+        "observedModelInvoked": 1,
+        "observedSucceeded": 1,
+        "injectedPairsWithoutObservedInvocation": 0,
+        "name": "react-review",
+        "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+        "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c"
+      },
+      {
+        "recommended": 1,
+        "injected": 0,
+        "observedModelInvoked": 0,
+        "observedSucceeded": 0,
+        "injectedPairsWithoutObservedInvocation": 0,
+        "name": "café-testing",
+        "catalogIdentity": "38a5c6d754d3cd8f726bc7ecf7cb875d3fbb97097fdbb8ca4479a90de483f6b8",
+        "contentHash": "1ef0ae7bbe4ce6c99ab744fe8c27582178d69c660538ef6a4b201cf5a944e17a"
+      }
+    ]
+  },
+  "invocationHealth": {
+    "available": true,
+    "validEvents": 2,
+    "invalidLines": 0,
+    "duplicates": 0,
+    "attempted": 1,
+    "succeeded": 1,
+    "failed": 0,
+    "attemptedOnly": 0,
+    "unresolved": 0,
+    "conflicting": 0,
+    "terminalWithoutAttempt": 0
+  },
+  "providers": [
+    {
+      "provider": "mock",
+      "count": 4
+    }
+  ],
+  "averageSelectedSkills": 0.75,
+  "p50LatencyMs": 30.75,
+  "p95LatencyMs": 842.48,
+  "distinctCatalogFingerprints": 1,
+  "skillsSeen": 3,
+  "skillsEverSelected": 2,
+  "skillsNeverSelected": 1,
+  "skillStatistics": [
+    {
+      "name": "react-review",
+      "agent": "claude-code",
+      "scope": "user",
+      "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c",
+      "seen": 3,
+      "selected": 2,
+      "selectionRate": 0.6666666666666666
+    },
+    {
+      "name": "café-testing",
+      "agent": "claude-code",
+      "scope": "user",
+      "contentHash": "1ef0ae7bbe4ce6c99ab744fe8c27582178d69c660538ef6a4b201cf5a944e17a",
+      "seen": 2,
+      "selected": 1,
+      "selectionRate": 0.5
+    },
+    {
+      "name": "日本語レビュー",
+      "agent": "claude-code",
+      "scope": "user",
+      "contentHash": "3460ebae1c45bfd069074b365281354cfdf41b82ffb05c7eedd6775446fcd3a4",
+      "seen": 2,
+      "selected": 0,
+      "selectionRate": 0
+    }
+  ]
+}

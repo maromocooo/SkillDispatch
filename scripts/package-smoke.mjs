@@ -44,11 +44,25 @@ try {
     "claude-advisory-smoke",
     "claude-catalog-smoke",
     "claude-invocation-smoke",
+    "trace-display-smoke",
   ]) {
     stage = script;
     const run = spawnSync(
       process.execPath,
-      [fileURLToPath(new URL(`./${script}.mjs`, import.meta.url)), cli],
+      [
+        fileURLToPath(new URL(`./${script}.mjs`, import.meta.url)),
+        cli,
+        ...(script === "trace-display-smoke" && process.argv.includes("--pty")
+          ? ["--pty"]
+          : []),
+        ...(script === "trace-display-smoke" &&
+        process.argv.includes("--examples")
+          ? [
+              "--examples",
+              resolve(process.argv[process.argv.indexOf("--examples") + 1]),
+            ]
+          : []),
+      ],
       { env, encoding: "utf8", timeout: 120000 },
     );
     assert.equal(run.status, 0, `Installed ${script} failed`);

@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "totalLines": 5,
+  "validTraces": 4,
+  "invalidLines": 1,
+  "matchedTraces": 4,
+  "trace": {
+    "traceId": "00000000-0000-4000-8000-000000000001",
+    "timestamp": "2000-01-02T03:04:05.678Z",
+    "agent": "claude-code",
+    "outcome": "complete",
+    "mode": "advisory",
+    "injectedCount": 1,
+    "provider": "mock",
+    "model": "synthetic-model",
+    "selectedCount": 2,
+    "latencyMs": 842.48,
+    "schemaVersion": "1.0",
+    "promptStorage": "raw",
+    "policy": {
+      "threshold": 0.75,
+      "maxSkills": 4
+    },
+    "catalog": {
+      "fingerprint": "696d0268a5bad0b16086967294e07bad7622ded6cfba3d9ca08bd9f5c8fe07b5",
+      "skillCount": 3,
+      "enabledSkillCount": 3
+    },
+    "decisions": [
+      {
+        "name": "react-review",
+        "agent": "claude-code",
+        "scope": "user",
+        "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c",
+        "probability": 0.94,
+        "selected": true,
+        "injected": true
+      },
+      {
+        "name": "café-testing",
+        "agent": "claude-code",
+        "scope": "user",
+        "contentHash": "1ef0ae7bbe4ce6c99ab744fe8c27582178d69c660538ef6a4b201cf5a944e17a",
+        "probability": 0.82,
+        "selected": true,
+        "injected": false
+      },
+      {
+        "name": "日本語レビュー",
+        "agent": "claude-code",
+        "scope": "user",
+        "contentHash": "3460ebae1c45bfd069074b365281354cfdf41b82ffb05c7eedd6775446fcd3a4",
+        "probability": 0.22,
+        "selected": false,
+        "injected": false
+      }
+    ],
+    "diagnostics": []
+  },
+  "modelInvocations": {
+    "observerConfigured": true,
+    "streamReadable": true,
+    "correlationAvailable": true,
+    "calls": [
+      {
+        "nativeInvocationName": "react-review",
+        "resolved": true,
+        "executionContext": "main",
+        "timestamp": "2000-01-02T03:04:06.000Z",
+        "attempted": true,
+        "outcome": "succeeded"
+      }
+    ]
+  }
+}

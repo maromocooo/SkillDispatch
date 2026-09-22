@@ -129,7 +129,9 @@ try {
   assert.ok(
     unobservedShow.includes("Invocation observer: configured / best-effort"),
   );
-  assert.ok(unobservedShow.includes("Model skill invocations observed: none"));
+  assert.ok(
+    unobservedShow.includes("No model skill invocation event observed."),
+  );
   for (const event of ["PostToolUse", "PreToolUse"]) {
     // physical completion-before-attempt regression
     const h = handler(event);

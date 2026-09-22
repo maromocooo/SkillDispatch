@@ -1,0 +1,295 @@
+{
+  "traces": [
+    {
+      "schemaVersion": "1.0",
+      "traceId": "00000000-0000-4000-8000-000000000001",
+      "timestamp": "2000-01-02T03:04:05.678Z",
+      "agent": "claude-code",
+      "mode": "advisory",
+      "prompt": {
+        "storage": "raw",
+        "raw": "PRIVATE_RAW_PROMPT_SENTINEL"
+      },
+      "host": {
+        "event": "UserPromptSubmit",
+        "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+        "promptKey": "bbad1fba8db69cc8174312dc253cd8a6d1ea486351a794bed6e9dc5c3f2bc9b6"
+      },
+      "catalog": {
+        "fingerprint": "696d0268a5bad0b16086967294e07bad7622ded6cfba3d9ca08bd9f5c8fe07b5",
+        "skillCount": 3,
+        "enabledSkillCount": 3
+      },
+      "router": {
+        "provider": "mock",
+        "model": "synthetic-model",
+        "latencyMs": 842.48
+      },
+      "policy": {
+        "threshold": 0.75,
+        "maxSkills": 4
+      },
+      "outcome": "complete",
+      "capabilities": {
+        "skillInvocationTelemetry": true
+      },
+      "decisions": [
+        {
+          "skillId": "6049aefc3c8d850b01d700dccf394f3b8475bf15871140740dccf181a5f3f872",
+          "name": "react-review",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c",
+          "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+          "probability": 0.94,
+          "selected": true
+        },
+        {
+          "skillId": "73545c1aad08b159490e3e2b2c2305bc6ed3f56a4a9ae1a0099f8e8a4245ed3f",
+          "name": "café-testing",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "1ef0ae7bbe4ce6c99ab744fe8c27582178d69c660538ef6a4b201cf5a944e17a",
+          "catalogIdentity": "38a5c6d754d3cd8f726bc7ecf7cb875d3fbb97097fdbb8ca4479a90de483f6b8",
+          "probability": 0.82,
+          "selected": true
+        },
+        {
+          "skillId": "2773f24dc0981598e971d2ce47f817485f4444eda25becc7257c30aa9b9afb47",
+          "name": "日本語レビュー",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "3460ebae1c45bfd069074b365281354cfdf41b82ffb05c7eedd6775446fcd3a4",
+          "catalogIdentity": "268cb41d72ca830e053aa6338d2f627e537c771364370f7d69a737d5b47d8195",
+          "probability": 0.22,
+          "selected": false
+        }
+      ],
+      "diagnostics": [],
+      "delivery": {
+        "kind": "claude-advisory",
+        "injectedSkillIds": [
+          "6049aefc3c8d850b01d700dccf394f3b8475bf15871140740dccf181a5f3f872"
+        ]
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "traceId": "00000000-0000-4000-8000-000000000002",
+      "timestamp": "2000-01-02T03:04:06.678Z",
+      "agent": "claude-code",
+      "mode": "advisory",
+      "prompt": {
+        "storage": "raw",
+        "raw": "PRIVATE_RAW_PROMPT_SENTINEL"
+      },
+      "host": {
+        "event": "UserPromptSubmit",
+        "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+        "promptKey": "c55418bf643ec0e5e33c6ad3a469cae4e3d6f33b915c47db4094d2c1c8a28c5c"
+      },
+      "catalog": {
+        "fingerprint": "696d0268a5bad0b16086967294e07bad7622ded6cfba3d9ca08bd9f5c8fe07b5",
+        "skillCount": 3,
+        "enabledSkillCount": 3
+      },
+      "router": {
+        "provider": "mock",
+        "model": "synthetic-model",
+        "latencyMs": 20.5
+      },
+      "policy": {
+        "threshold": 0.75,
+        "maxSkills": 4
+      },
+      "outcome": "complete",
+      "capabilities": {
+        "skillInvocationTelemetry": true
+      },
+      "decisions": [
+        {
+          "skillId": "6049aefc3c8d850b01d700dccf394f3b8475bf15871140740dccf181a5f3f872",
+          "name": "react-review",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c",
+          "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+          "probability": 0.94,
+          "selected": false
+        },
+        {
+          "skillId": "73545c1aad08b159490e3e2b2c2305bc6ed3f56a4a9ae1a0099f8e8a4245ed3f",
+          "name": "café-testing",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "1ef0ae7bbe4ce6c99ab744fe8c27582178d69c660538ef6a4b201cf5a944e17a",
+          "catalogIdentity": "38a5c6d754d3cd8f726bc7ecf7cb875d3fbb97097fdbb8ca4479a90de483f6b8",
+          "probability": 0.82,
+          "selected": false
+        },
+        {
+          "skillId": "2773f24dc0981598e971d2ce47f817485f4444eda25becc7257c30aa9b9afb47",
+          "name": "日本語レビュー",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "3460ebae1c45bfd069074b365281354cfdf41b82ffb05c7eedd6775446fcd3a4",
+          "catalogIdentity": "268cb41d72ca830e053aa6338d2f627e537c771364370f7d69a737d5b47d8195",
+          "probability": 0.22,
+          "selected": false
+        }
+      ],
+      "diagnostics": [],
+      "delivery": {
+        "kind": "none",
+        "injectedSkillIds": []
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "traceId": "00000000-0000-4000-8000-000000000003",
+      "timestamp": "2000-01-02T03:04:07.678Z",
+      "agent": "claude-code",
+      "mode": "advisory",
+      "prompt": {
+        "storage": "raw",
+        "raw": "PRIVATE_RAW_PROMPT_SENTINEL"
+      },
+      "host": {
+        "event": "UserPromptSubmit",
+        "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+        "promptKey": "563a6393f9d62c66524f3aa171353bfb70b33959594c462daae582add194bddb"
+      },
+      "catalog": {
+        "fingerprint": "696d0268a5bad0b16086967294e07bad7622ded6cfba3d9ca08bd9f5c8fe07b5",
+        "skillCount": 3,
+        "enabledSkillCount": 3
+      },
+      "router": {
+        "provider": "mock",
+        "model": "synthetic-model",
+        "latencyMs": 30.75
+      },
+      "policy": {
+        "threshold": 0.75,
+        "maxSkills": 4
+      },
+      "outcome": "partial",
+      "capabilities": {
+        "skillInvocationTelemetry": true
+      },
+      "decisions": [
+        {
+          "skillId": "6049aefc3c8d850b01d700dccf394f3b8475bf15871140740dccf181a5f3f872",
+          "name": "react-review",
+          "agent": "claude-code",
+          "scope": "user",
+          "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c",
+          "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+          "probability": 0.94,
+          "selected": true
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "provider_partial",
+          "level": "warning"
+        }
+      ],
+      "delivery": {
+        "kind": "none",
+        "injectedSkillIds": []
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "traceId": "00000000-0000-4000-8000-000000000004",
+      "timestamp": "2000-01-02T03:04:08.678Z",
+      "agent": "claude-code",
+      "mode": "advisory",
+      "prompt": {
+        "storage": "raw",
+        "raw": "PRIVATE_RAW_PROMPT_SENTINEL"
+      },
+      "host": {
+        "event": "UserPromptSubmit",
+        "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+        "promptKey": "c48c54f34eccc55c3c424fa8b21f10a98fecb8080184bbd68eb2d85f5020c8ac"
+      },
+      "catalog": {
+        "fingerprint": "696d0268a5bad0b16086967294e07bad7622ded6cfba3d9ca08bd9f5c8fe07b5",
+        "skillCount": 3,
+        "enabledSkillCount": 3
+      },
+      "router": {
+        "provider": "mock",
+        "model": "synthetic-model",
+        "latencyMs": 41.0
+      },
+      "policy": {
+        "threshold": 0.75,
+        "maxSkills": 4
+      },
+      "outcome": "failed",
+      "capabilities": {
+        "skillInvocationTelemetry": true
+      },
+      "decisions": [],
+      "diagnostics": [
+        {
+          "code": "provider_error",
+          "level": "error"
+        }
+      ],
+      "delivery": {
+        "kind": "none",
+        "injectedSkillIds": []
+      }
+    }
+  ],
+  "events": [
+    {
+      "schemaVersion": "1.0",
+      "eventId": "10000000-0000-4000-8000-000000000002",
+      "timestamp": "2000-01-02T03:04:06.050Z",
+      "agent": "claude-code",
+      "phase": "succeeded",
+      "source": "model-skill-tool",
+      "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+      "promptKey": "bbad1fba8db69cc8174312dc253cd8a6d1ea486351a794bed6e9dc5c3f2bc9b6",
+      "toolUseKey": "03a8cdff533a16d42942cfe9b22644e3ebb3979fa71cffcbf74e3db0e2b3179f",
+      "skill": {
+        "nativeInvocationName": "react-review",
+        "resolved": true,
+        "name": "react-review",
+        "origin": "local-user",
+        "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+        "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c"
+      },
+      "executionContext": {
+        "kind": "main"
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "eventId": "10000000-0000-4000-8000-000000000001",
+      "timestamp": "2000-01-02T03:04:06.000Z",
+      "agent": "claude-code",
+      "phase": "attempted",
+      "source": "model-skill-tool",
+      "sessionKey": "7ae99811b2c7c696275f6aca5adcedd71a90d8ab3ced71cd81d7e2c8020628fd",
+      "promptKey": "bbad1fba8db69cc8174312dc253cd8a6d1ea486351a794bed6e9dc5c3f2bc9b6",
+      "toolUseKey": "03a8cdff533a16d42942cfe9b22644e3ebb3979fa71cffcbf74e3db0e2b3179f",
+      "skill": {
+        "nativeInvocationName": "react-review",
+        "resolved": true,
+        "name": "react-review",
+        "origin": "local-user",
+        "catalogIdentity": "8028a1cedd63ff5d3e61904b4d3a2c63f52a9540ddd2d38b5d3c24e5f85bb803",
+        "contentHash": "913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c"
+      },
+      "executionContext": {
+        "kind": "main"
+      }
+    }
+  ]
+}
