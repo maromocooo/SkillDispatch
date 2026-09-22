@@ -23,7 +23,14 @@ beforeAll(async () => {
     banner: {
       js: 'import { createRequire as testRequire } from "node:module"; const require = testRequire(import.meta.url);',
     },
-    noExternal: ["@typesafe-ai/sdk", "zod", "yaml", "commander", "smol-toml"],
+    noExternal: [
+      "@typesafe-ai/sdk",
+      "zod",
+      "yaml",
+      "commander",
+      "smol-toml",
+      "jsonc-parser",
+    ],
     silent: true,
     config: false,
   });
