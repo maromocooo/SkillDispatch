@@ -1,0 +1,629 @@
+# Synthetic authored labels. Maintainer review pending; not Jev-generated ground truth.
+version: 1
+cases:
+  - id: explicit-01
+    prompt: "Build a React registration form with controlled inputs."
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-02
+    prompt: "Write interaction tests for the web login form."
+    should: 
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-03
+    prompt: "Audit keyboard focus and labels in this web dialog."
+    should: 
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-04
+    prompt: "Implement a Node.js HTTP endpoint for creating notes."
+    should: 
+      - {"name": "node-api", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-05
+    prompt: "Design the request and response contract for a paginated REST endpoint."
+    should: 
+      - {"name": "api-contracts", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-06
+    prompt: "Review this session cookie and token verification design."
+    should: 
+      - {"name": "authentication-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-07
+    prompt: "Analyze the query plan for a slow SQL join."
+    should: 
+      - {"name": "sql-performance", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-08
+    prompt: "Plan a reversible migration adding a non-null database column."
+    should: 
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-09
+    prompt: "Write Python code to clean and aggregate this CSV."
+    should: 
+      - {"name": "python-data", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-10
+    prompt: "Add pytest tests for this Python date parser."
+    should: 
+      - {"name": "python-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-11
+    prompt: "Fix actor isolation in this Swift async function."
+    should: 
+      - {"name": "swift-concurrency", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-12
+    prompt: "Review VoiceOver labels and Dynamic Type in this iOS screen."
+    should: 
+      - {"name": "ios-accessibility", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-13
+    prompt: "Create a GitHub Actions test matrix for Node 20 and 24."
+    should: 
+      - {"name": "github-actions", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-14
+    prompt: "Prepare a release checklist for version 1.2.0."
+    should: 
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-15
+    prompt: "Configure a rolling container deployment with health checks."
+    should: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-16
+    prompt: "Triage an ongoing service outage and propose safe mitigation."
+    should: 
+      - {"name": "incident-triage", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-17
+    prompt: "Write a getting-started README for this library."
+    should: 
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-18
+    prompt: "Document the existing HTTP endpoint parameters and responses."
+    should: 
+      - {"name": "api-docs", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-19
+    prompt: "Review this application for injection risks and unsafe trust boundaries."
+    should: 
+      - {"name": "security-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-20
+    prompt: "Audit vulnerable transitive dependencies and propose upgrades."
+    should: 
+      - {"name": "dependency-audit", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-21
+    prompt: "Draft an issue ticket for the broken save button with acceptance criteria."
+    should: 
+      - {"name": "issue-triage", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-22
+    prompt: "Extract the table from this PDF and check the page layout."
+    should: 
+      - {"name": "pdf-workflow", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-23
+    prompt: "Check spreadsheet formulas and summarize totals by category."
+    should: 
+      - {"name": "spreadsheet-analysis", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: explicit-24
+    prompt: "Review this change for general correctness and maintainability."
+    should: 
+      - {"name": "code-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-01
+    prompt: "Keep the React search box value in sync with the results without reloading the page."
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-02
+    prompt: "Catch a regression where clicking Submit twice creates two UI notifications."
+    should: 
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-03
+    prompt: "A screen reader cannot tell which web input contains an error; investigate the markup."
+    should: 
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-04
+    prompt: "Make our JavaScript server return a clear 400 response when a required field is absent."
+    should: 
+      - {"name": "node-api", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-05
+    prompt: "External clients need a compatible way to request the next page of results; propose the interface."
+    should: 
+      - {"name": "api-contracts", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-06
+    prompt: "Could a signed-in account retrieve another account data by changing an identifier? Review the access boundary."
+    should: 
+      - {"name": "authentication-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-07
+    prompt: "This report scans every row despite an index; explain the database plan and improve the query."
+    should: 
+      - {"name": "sql-performance", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-08
+    prompt: "We need to fill a new column for existing records before making it mandatory without downtime."
+    should: 
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-09
+    prompt: "Normalize inconsistent date strings in a Python data pipeline before grouping records by month."
+    should: 
+      - {"name": "python-data", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-10
+    prompt: "Protect the Python helper against empty strings, leap days and invalid values with automated checks."
+    should: 
+      - {"name": "python-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-11
+    prompt: "A cancelled Swift Task still updates shared state; make cancellation and isolation correct."
+    should: 
+      - {"name": "swift-concurrency", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-12
+    prompt: "When the iPhone text size is increased, the native confirmation button becomes unreachable."
+    should: 
+      - {"name": "ios-accessibility", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-13
+    prompt: "Our pull request checks never start after a workflow file change; diagnose the event filter."
+    should: 
+      - {"name": "github-actions", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-14
+    prompt: "Before publishing this library, verify its version, changelog and package contents."
+    should: 
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-15
+    prompt: "New containers receive traffic before they are ready; fix the rollout readiness configuration."
+    should: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-16
+    prompt: "Error rates spiked after the last rollout and customers are blocked; establish a timeline and containment plan."
+    should: 
+      - {"name": "incident-triage", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-17
+    prompt: "A new contributor cannot find the build and test steps; make the project guide usable."
+    should: 
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-18
+    prompt: "Readers need a copyable request and an explanation of every response field for this stable endpoint."
+    should: 
+      - {"name": "api-docs", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-19
+    prompt: "Untrusted input reaches a command runner and a template engine; assess the attack surface."
+    should: 
+      - {"name": "security-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-20
+    prompt: "The scanner flags a library pulled in indirectly; identify a safe version update path."
+    should: 
+      - {"name": "dependency-audit", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-21
+    prompt: "Turn this bug report into a reproducible, scoped work item the team can pick up."
+    should: 
+      - {"name": "issue-triage", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-22
+    prompt: "The exported paginated document clips the footer; inspect the PDF rendering."
+    should: 
+      - {"name": "pdf-workflow", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-23
+    prompt: "The workbook grand total disagrees with the visible rows; trace the formulas and correct the calculation."
+    should: 
+      - {"name": "spreadsheet-analysis", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: paraphrase-24
+    prompt: "Look over this patch for edge cases and confusing control flow without rewriting it."
+    should: 
+      - {"name": "code-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-01
+    prompt: "Build a React form and write interaction tests."
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-02
+    prompt: "Implement the React dialog and audit its keyboard focus behavior."
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-03
+    prompt: "Test web keyboard navigation and audit screen-reader labels."
+    should: 
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-04
+    prompt: "Design an HTTP API contract and implement it in Node.js."
+    should: 
+      - {"name": "api-contracts", "agent": "claude-code", "scope": "repo"}
+      - {"name": "node-api", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-05
+    prompt: "Implement a Node endpoint and review its account authorization boundary."
+    should: 
+      - {"name": "node-api", "agent": "claude-code", "scope": "repo"}
+      - {"name": "authentication-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-06
+    prompt: "Tune the slow SQL query and plan the index migration rollout."
+    should: 
+      - {"name": "sql-performance", "agent": "claude-code", "scope": "repo"}
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-07
+    prompt: "Clean this CSV in Python and write pytest coverage for the transformation."
+    should: 
+      - {"name": "python-data", "agent": "claude-code", "scope": "repo"}
+      - {"name": "python-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-08
+    prompt: "Fix Swift Task isolation and review the iOS screen with VoiceOver."
+    should: 
+      - {"name": "swift-concurrency", "agent": "claude-code", "scope": "repo"}
+      - {"name": "ios-accessibility", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-09
+    prompt: "Add a GitHub Actions matrix and prepare the library release checklist."
+    should: 
+      - {"name": "github-actions", "agent": "claude-code", "scope": "repo"}
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-10
+    prompt: "Triage the current outage and fix container readiness for the next rollout."
+    should: 
+      - {"name": "incident-triage", "agent": "claude-code", "scope": "repo"}
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-11
+    prompt: "Write the project getting-started guide and document existing API responses."
+    should: 
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+      - {"name": "api-docs", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-12
+    prompt: "Review application injection risks and audit vulnerable dependencies."
+    should: 
+      - {"name": "security-review", "agent": "claude-code", "scope": "repo"}
+      - {"name": "dependency-audit", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-13
+    prompt: "Draft a bug ticket and add reproduction instructions to the contributor guide."
+    should: 
+      - {"name": "issue-triage", "agent": "claude-code", "scope": "repo"}
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-14
+    prompt: "Check workbook totals and create a PDF report of the findings."
+    should: 
+      - {"name": "spreadsheet-analysis", "agent": "claude-code", "scope": "repo"}
+      - {"name": "pdf-workflow", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-15
+    prompt: "Review the overall patch and add pytest coverage for its Python helpers."
+    should: 
+      - {"name": "code-review", "agent": "claude-code", "scope": "repo"}
+      - {"name": "python-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: multi-16
+    prompt: "Implement an accessible React form, test its interactions, and review keyboard navigation."
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-01
+    prompt: "What is two plus two?"
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-02
+    prompt: "Write a short poem about rain."
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-03
+    prompt: "Translate hello into Spanish."
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-04
+    prompt: "Give me three names for a pet turtle."
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-05
+    prompt: "What color is a ripe banana?"
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-06
+    prompt: "Explain the difference between a mountain and a hill."
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-07
+    prompt: "こんにちは。今日は挨拶だけです。"
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: no-skill-08
+    prompt: "Tell me a fictional story about a lighthouse."
+    should: []
+    should_not: []
+    fully_labeled: true
+  - id: negative-01
+    prompt: "Only audit web keyboard focus; do not implement a React component."
+    should: 
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-02
+    prompt: "Add frontend interaction tests but do not deploy containers."
+    should: 
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-03
+    prompt: "Document existing API parameters; do not redesign the contract."
+    should: 
+      - {"name": "api-docs", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "api-contracts", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-04
+    prompt: "Tune this SQL query, without any schema migration."
+    should: 
+      - {"name": "sql-performance", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-05
+    prompt: "Review login session validation only, not a broad security audit."
+    should: 
+      - {"name": "authentication-review", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "security-review", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-06
+    prompt: "Write a README, without adding GitHub Actions."
+    should: 
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "github-actions", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-07
+    prompt: "Analyze the workbook directly; do not write Python data code."
+    should: 
+      - {"name": "spreadsheet-analysis", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "python-data", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: negative-08
+    prompt: "Only check dependency advisories, not the general patch quality."
+    should: 
+      - {"name": "dependency-audit", "agent": "claude-code", "scope": "repo"}
+    should_not: 
+      - {"name": "code-review", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: japanese-01
+    prompt: "Reactの入力フォームを実装してください。"
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-02
+    prompt: "Web画面をキーボードだけで操作できるか確認してください。"
+    should: 
+      - {"name": "accessibility-review", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-03
+    prompt: "Pythonの日付処理にpytestのテストを追加してください。"
+    should: 
+      - {"name": "python-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-04
+    prompt: "Swiftのactor分離とキャンセル処理を修正してください。"
+    should: 
+      - {"name": "swift-concurrency", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-05
+    prompt: "SQLの実行計画を確認して遅いクエリを改善してください。"
+    should: 
+      - {"name": "sql-performance", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-06
+    prompt: "新規参加者向けにビルド手順のREADMEを書いてください。"
+    should: 
+      - {"name": "docs-writer", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-07
+    prompt: "PDFの表を抽出してページのレイアウトを確認してください。"
+    should: 
+      - {"name": "pdf-workflow", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: japanese-08
+    prompt: "不具合の再現手順と受け入れ条件をチケットにまとめてください。"
+    should: 
+      - {"name": "issue-triage", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-01
+    prompt: "React formを実装してinteraction testsも書いてください。"
+    should: 
+      - {"name": "react-components", "agent": "claude-code", "scope": "repo"}
+      - {"name": "frontend-testing", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-02
+    prompt: "Node.js endpointのrequest validationを追加してください。"
+    should: 
+      - {"name": "node-api", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-03
+    prompt: "GitHub Actionsのmatrix jobが動かないので修正してください。"
+    should: 
+      - {"name": "github-actions", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-04
+    prompt: "iOS screenのVoiceOver labelsを確認してください。"
+    should: 
+      - {"name": "ios-accessibility", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-05
+    prompt: "CSVをPythonでcleanしてmonthly totalsを集計してください。"
+    should: 
+      - {"name": "python-data", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-06
+    prompt: "SpreadsheetのSUM formulaが間違っているので調べてください。"
+    should: 
+      - {"name": "spreadsheet-analysis", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-07
+    prompt: "Container rolloutのreadiness probeを設定してください。"
+    should: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: mixed-08
+    prompt: "Release checklistでversionとchangelogを確認してください。"
+    should: 
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    should_not: []
+    fully_labeled: true
+  - id: ambiguous-01
+    prompt: "Make this better."
+    should: []
+    should_not: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: ambiguous-02
+    prompt: "Can you help with my project?"
+    should: []
+    should_not: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: ambiguous-03
+    prompt: "何か気になるところはありますか？"
+    should: []
+    should_not: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
+  - id: ambiguous-04
+    prompt: "Something looks wrong, but I have not shared any code or artifact yet."
+    should: []
+    should_not: 
+      - {"name": "container-deployment", "agent": "claude-code", "scope": "repo"}
+      - {"name": "database-migrations", "agent": "claude-code", "scope": "repo"}
+      - {"name": "release-checklist", "agent": "claude-code", "scope": "repo"}
+    fully_labeled: false
