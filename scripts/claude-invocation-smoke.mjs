@@ -109,6 +109,27 @@ try {
   const traceText = await readFile(tracePath, "utf8");
   const trace = JSON.parse(traceText.trim());
   assert.equal(trace.capabilities.skillInvocationTelemetry, true);
+  // Local registration readiness cannot prove that async hooks ran or delivered anything.
+  const unobserved = JSON.parse(
+    run(["traces", "summary", "--json"]),
+  ).advisoryFunnel;
+  assert.equal(unobserved.telemetryConfiguredTraces, 1);
+  assert.equal(unobserved.recommended, 1);
+  assert.equal(unobserved.injected, 1);
+  assert.equal(unobserved.observedModelInvoked, 0);
+  assert.equal(unobserved.observedSucceeded, 0);
+  assert.equal(unobserved.injectedPairsWithoutObservedInvocation, 1);
+  for (const removed of [
+    "notInvoked",
+    "injectedToModelInvoked",
+    "modelInvokedToSucceeded",
+  ])
+    assert.ok(!Object.hasOwn(unobserved, removed));
+  const unobservedShow = run(["traces", "show", trace.traceId]);
+  assert.ok(
+    unobservedShow.includes("Invocation observer: configured / best-effort"),
+  );
+  assert.ok(unobservedShow.includes("Model skill invocations observed: none"));
   for (const event of ["PostToolUse", "PreToolUse"]) {
     // physical completion-before-attempt regression
     const h = handler(event);
@@ -160,9 +181,19 @@ try {
     for (const item of forbidden) assert.ok(!text.includes(item));
   }
   const summary = JSON.parse(run(["traces", "summary", "--json"]));
-  for (const key of ["recommended", "injected", "modelInvoked", "succeeded"])
+  for (const key of [
+    "recommended",
+    "injected",
+    "observedModelInvoked",
+    "observedSucceeded",
+  ])
     assert.equal(summary.advisoryFunnel[key], 1);
-  assert.equal(summary.advisoryFunnel.injectedToModelInvoked, 1);
+  assert.equal(
+    summary.advisoryFunnel.injectedPairsWithoutObservedInvocation,
+    0,
+  );
+  assert.ok(!Object.hasOwn(summary.advisoryFunnel, "injectedToModelInvoked"));
+  assert.ok(!Object.hasOwn(summary.advisoryFunnel, "modelInvokedToSucceeded"));
   const show = JSON.parse(run(["traces", "show", trace.traceId, "--json"]));
   assert.equal(show.modelInvocations.calls[0].outcome, "succeeded");
   const doctor = JSON.parse(run(["doctor", "--json"]));

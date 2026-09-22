@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CliEnvironment } from "../../src/cli/context.js";
 import { createProgram } from "../../src/cli/program.js";
 import { workspace, write } from "../helpers.js";
-import { traceFixture } from "../telemetry/helpers.js";
+import { eventFixture } from "../observability/helpers.js";
+import { digest, traceFixture } from "../telemetry/helpers.js";
 
 async function run(args: string[], ctx: CliEnvironment) {
   let stdout = "",
@@ -91,6 +92,116 @@ describe("operational trace CLI", () => {
       expect(fetch).not.toHaveBeenCalled();
       expect(await readFile(path)).toEqual(before);
       expect((await stat(path)).mtimeMs).toBe(beforeStat.mtimeMs);
+    },
+  );
+  it.each(["none", "attempted", "succeeded", "failed"] as const)(
+    "reports only observed evidence for %s without claiming exact conversion",
+    async (phase) => {
+      const { ctx, path, raw } = await fixture();
+      const pre = eventFixture({ tool_input: { skill: "react" } });
+      raw.agent = "claude-code";
+      raw.mode = "advisory";
+      raw.capabilities = { skillInvocationTelemetry: true };
+      raw.host = {
+        event: "UserPromptSubmit",
+        sessionKey: pre.sessionKey,
+        promptKey: pre.promptKey as string,
+      };
+      const decision = raw.decisions[0];
+      if (!decision) throw new Error("Missing fixture decision");
+      decision.agent = "claude-code";
+      decision.catalogIdentity = digest("react-identity");
+      pre.skill = {
+        nativeInvocationName: "react",
+        resolved: true,
+        name: decision.name,
+        origin: "local-user",
+        catalogIdentity: decision.catalogIdentity,
+        contentHash: decision.contentHash,
+      };
+      raw.delivery = {
+        kind: "claude-advisory",
+        injectedSkillIds: [decision.skillId],
+      };
+      await writeFile(path, `${JSON.stringify(raw)}\n`);
+      const events =
+        phase === "none"
+          ? []
+          : phase === "attempted"
+            ? [pre]
+            : [
+                // Terminal physically precedes attempt; phase still determines observed outcome.
+                { ...pre, phase },
+                pre,
+              ];
+      await writeFile(
+        join(ctx.env.SKILLDISPATCH_DATA_DIR as string, "invocations.jsonl"),
+        events.map((event) => `${JSON.stringify(event)}\n`).join(""),
+        { mode: 0o600 },
+      );
+      const fetch = vi.fn(() => {
+        throw new Error("Network forbidden");
+      });
+      vi.stubGlobal("fetch", fetch);
+      for (const json of [false, true]) {
+        const flags = json ? ["--json"] : [];
+        const summary = await run(["traces", "summary", ...flags], ctx);
+        const show = await run(["traces", "show", raw.traceId, ...flags], ctx);
+        expect(summary.error ?? show.error).toBeUndefined();
+        expect(summary.stderr + show.stderr).toBe("");
+        const output = summary.stdout + show.stdout;
+        for (const forbidden of [
+          "injectedToModelInvoked",
+          "modelInvokedToSucceeded",
+          "notInvoked",
+          "Injected -> Model invoked",
+          "Model invoked -> Succeeded",
+          "success rate",
+          "Claude did not invoke",
+          "PRIVATE_",
+          pre.sessionKey,
+          pre.promptKey as string,
+          pre.toolUseKey,
+        ])
+          expect(output).not.toContain(forbidden);
+        if (json) {
+          const funnel = JSON.parse(summary.stdout).advisoryFunnel;
+          expect(funnel).toMatchObject({
+            recommended: 1,
+            injected: 1,
+            observedModelInvoked: phase === "none" ? 0 : 1,
+            observedSucceeded: phase === "succeeded" ? 1 : 0,
+            injectedPairsWithoutObservedInvocation: phase === "none" ? 1 : 0,
+            telemetryConfiguredTraces: 1,
+            telemetryUnconfiguredTraces: 0,
+          });
+          const invocations = JSON.parse(show.stdout).modelInvocations;
+          expect(invocations.observerConfigured).toBe(true);
+          expect(invocations.calls).toHaveLength(phase === "none" ? 0 : 1);
+          if (phase !== "none")
+            expect(invocations.calls[0].outcome).toBe(
+              phase === "attempted" ? "unknown" : phase,
+            );
+        } else {
+          expect(summary.stdout).toContain("Observed model-invoked:");
+          expect(summary.stdout).toContain("Observed succeeded:");
+          expect(summary.stdout).toContain("Observer-configured traces: 1");
+          expect(summary.stdout).toContain("missing events remain unknown");
+          expect(show.stdout).toContain(
+            "Invocation observer: configured / best-effort",
+          );
+          expect(show.stdout).toContain("Model skill invocations observed:");
+          if (phase === "none")
+            expect(show.stdout).toContain(
+              "Model skill invocations observed: none",
+            );
+          else
+            expect(show.stdout).toContain(
+              `react attempted -> ${phase === "attempted" ? "unknown" : phase}`,
+            );
+        }
+      }
+      expect(fetch).not.toHaveBeenCalled();
     },
   );
   it("reports invalid lines but continues, with stable JSON shapes", async () => {
