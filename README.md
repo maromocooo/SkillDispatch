@@ -6,10 +6,11 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR8 development preview: discovery, routing, evaluation, private local
+**Status:** PR9 development preview: discovery, routing, evaluation, private local
 traces, operational CLI, user hook registration, and explicit **Claude advisory**.
 Both hosts default to shadow. Codex remains shadow-only. Real Jev routing quality
-has not been established; native skill invocation is not observed.
+has not been established. Optional Claude Skill observers record model-initiated
+native tool lifecycles locally; this does not measure task quality.
 
 ## Install from source
 
@@ -886,7 +887,8 @@ frequency maps for latencies and skill versions plus distinct catalog fingerprin
 not trace bodies; memory therefore grows with unique values. List retains at most
 its requested limit; show retains one redacted detail view. All commands scan the
 file, with no index, rotation, repair or deletion. These statistics describe router
-behavior, not skill usefulness or actual invocation.
+behavior, not skill usefulness. The separate PR9 funnel reports observed model
+Skill calls only when correlation and observer availability permit it.
 
 To repeat the installed package check offline after packing/installing in a
 temporary directory:
@@ -898,6 +900,8 @@ node scripts/trace-ops-smoke.mjs /path/to/install/node_modules/.bin/skilldispatc
 This explicit development script uses temporary settings and denies fetch; it is
 not run by normal tests, CI or prepack. No online doctor or raw-prompt display
 option exists. Advisory remains deferred.
+
+## Claude model Skill invocation telemetry
 
 Claude native Skill observer (PR9): `skilldispatch hook claude-skill` accepts
 `PreToolUse`, `PostToolUse`, or `PostToolUseFailure` JSON for `tool_name: "Skill"`
@@ -925,3 +929,44 @@ Old traces are **telemetry unavailable**, not negative examples. Attempts withou
 a terminal event remain unknown; async hooks can be terminated with the host.
 Subagent-marked events remain visible separately and do not count as main-turn
 adoption. No transcript parsing or online calls are used to fill gaps.
+
+After updating an existing installation:
+
+```sh
+pnpm build
+pnpm skilldispatch hooks install claude
+pnpm skilldispatch hooks status claude
+pnpm skilldispatch doctor
+# Reload/restart Claude Code, then use it normally.
+pnpm skilldispatch traces summary --since 24h
+pnpm skilldispatch traces show <route-trace-id>
+```
+
+Registration checks are local prerequisites, not proof that host policy permits
+execution or that a background observer finished. No real-user settings are
+changed during tests. All three observer handlers use exact matcher `Skill` and
+`skilldispatch hook claude-skill`; `hooks uninstall claude` removes only the
+managed routing/observer registrations. Codex remains shadow-only.
+
+The invocation stream uses the existing private installation key. Session and
+prompt HMACs match routing traces; tool IDs use a separate session-scoped HMAC.
+Invocation storage has no project-configurable destination: it is always
+`<SkillDispatch data directory>/invocations.jsonl` (honoring
+`SKILLDISPATCH_DATA_DIR` / `XDG_DATA_HOME`). User `telemetry.enabled: false`
+disables observers even with trusted project routing config. `telemetry.prompt`
+does not enable prompt/argument persistence for observers.
+
+Summary's advisory funnel contains only observer-capable same-prompt records;
+existing advisory totals still include older records. `modelInvoked` counts
+recommended pairs with an observed main-context attempt. Injected-to-model
+conversion uses the intersection of injected and model-invoked pairs, so an
+independently invoked recommendation cannot inflate it. Success requires an
+observed success for an attempted tool lifecycle. Zero denominators yield
+`null` / `n/a`. Per-skill pair counts are available in summary JSON.
+
+Invocation stream health counts cover the full stream, while `--since` / `--agent`
+filter routing cohorts and their funnel. Invalid lines are counted and skipped;
+an unreadable/unsafe stream makes telemetry unavailable. No records are repaired,
+removed or uploaded. Raw prompt text, hashes and host correlation keys are never
+printed by trace commands. Matching is exact: aliases, unresolved/bundled names
+and changed catalog/content versions cannot receive speculative conversion credit.

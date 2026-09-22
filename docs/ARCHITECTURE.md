@@ -779,3 +779,87 @@ state, and skills-directory plugin trust are not inferred. Unknown registry vers
 ambiguous cached accounts/installations and unsafe sources have conservative diagnostics.
 See [PR8 validation](PR8_VALIDATION.md) for official sources, tested assumptions,
 known host differences and reproducible checks.
+
+## PR9 — Claude native Skill tool observability
+
+`src/observability/claude-skill-hook.ts` is a separate local-only runtime. The
+`hook claude-skill` entrypoint shares only the bounded stdin reader and silent
+4-second process deadline with routing hooks. It reads `tool_input.skill` for
+PreToolUse/PostToolUse/PostToolUseFailure whose `tool_name` is exactly `Skill`.
+Unknown fields are discarded, not spread; args, error, responses, transcripts,
+paths, API credentials and prompt text never enter the event projection. No
+provider is constructed and no Claude subprocess/transcript is used. The parser
+requires session/tool IDs and absolute cwd for catalog discovery; prompt ID is
+optional. Optional finite nonnegative `duration_ms` is projected only on terminal
+events; `is_interrupt` only on failures. Subagent ID presence becomes a boolean
+kind, not an ID or routing request.
+
+`invocation-types.ts` and `schemas/skill-invocation.schema.json` define a strict
+v1 event contract, separately from RouteTrace. The observer resolves native names
+by exact match against adapter-derived identifiers in the current catalog. It
+never resolves a display-name alias or guesses precedence. An absent/ambiguous
+match records `resolved: false` plus a fixed diagnostic code. A discovery exception
+still permits an unresolved event. Resolving an observed call is independent of
+model-routability: the event reports what the host emitted, not permission advice.
+
+Correlations use the same installation key as route records:
+
+- session: HMAC-SHA256 over `session\0claude-code\0<session_id>`;
+- prompt: HMAC-SHA256 over `host-prompt\0claude-code\0<prompt_id>`;
+- tool: HMAC-SHA256 over `tool-use\0` plus the JSON tuple
+  `["claude-code", session_id, tool_use_id]` (unambiguous tuple boundaries).
+
+`invocations.jsonl` has a fixed data-directory-relative location. Observer config
+is user-only, even with `hook.trustProjectConfig: true`. Its append sink validates
+schema and limits each UTF-8 record to 16 KiB, then performs one O_APPEND write.
+It rejects key/route-file aliases, symlinks, hardlinks and unsafe POSIX ownership
+or permissions; parent directories/files use 0700/0600. Key health is checked
+before persistence. Failure is silent and never changes tool permission or context.
+The shared generic private JSONL reader preserves the trace reader's 2 MiB line
+bound, snapshot size, UTF-8 validation and corrupt-line isolation. Route writes
+also reject the invocation destination. No stream is rewritten.
+
+Registration mutation generalizes the existing AST editor to four Claude events
+and still makes one atomic config replacement/first backup under the existing
+lock. Exact command + event + `Skill` matcher identifies an observer; modified
+matchers/conditional handlers are refused for install. Observers are always async,
+while UserPromptSubmit keeps its existing user-owned sync/advisory or async/shadow
+semantics. Missing observers do not disable an otherwise ready advisory hook.
+Status adds per-event observer state and `skill_invocation_telemetry_incomplete`;
+doctor adds an independent readiness check. Its PASS means safe local registration
+and storage prerequisites, not host delivery, trust or active-session policy.
+
+RouteTrace v1 gains optional `capabilities.skillInvocationTelemetry: true` and
+optional decision `catalogIdentity` (existing adapter-owned path-free digest).
+Legacy records remain valid. A capability is emitted only on Claude routes with
+a prompt ID, checked observer registrations and user-authorized safe storage.
+This is a cohort marker, not a delivery guarantee. It contains no raw native IDs
+or tool payloads. Existing recommended/selected and emitted/injected meanings are
+unchanged; routing traces are immutable.
+
+`invocation-analytics.ts` reads the event stream incrementally and indexes sanitized
+lifecycle state by session/tool keys, independent of physical append order. It
+deduplicates tool+phase using timestamp, event UUID and canonical record ordering.
+Contradictory identifiers/prompt IDs or both success and failure are unknown and
+excluded from conversion credit. A post event lacking prompt ID may complete an
+attempt with the same session/tool ID; an attempt without prompt ID never gets
+route conversion credit. Attempted-only means terminal outcome not observed.
+No completion is inferred from timeouts or permission denial.
+
+The advisory funnel uses observer-capable Claude advisory route × catalog identity
+× content hash pairs. It matches exact session/prompt and resolved main-context
+attempts. Repeated calls of one skill count once per route pair. Independent calls
+of a non-injected recommendation remain model-invoked recommendations, but only
+injected-and-invoked pairs contribute to the injection conversion numerator.
+Success requires that an eligible attempt's tool lifecycle has a success event.
+Subagent events are shown with their kind but excluded from main-turn adoption.
+Old/no-marker/no-prompt/unreadable-storage cohorts are unavailable, never negative
+examples. Undefined ratios are null. Per-skill JSON counts are deterministically
+ordered. Stream health is global; routing filters choose conversion cohorts.
+
+The index stores only lifecycle state, not all JSONL bytes or prompt bodies.
+Memory still grows with unique tool calls and skill versions; bounded-memory
+external joins/persistent indexes are future work. Async delivery is best effort;
+missing records can undercount adoption. Claude direct `/skillname` follows
+UserPromptExpansion and is deliberately outside this model-adoption funnel.
+Skill tool completion does not establish task success, adherence or output quality.
