@@ -24,7 +24,7 @@ export async function hookCommand(
       host === "codex" ? parseCodexInput(raw) : parseClaudeInput(raw);
     if (input) {
       const output = await runHook(input, environment, {
-        invocationAvailable: async () => {
+        invocationObserverConfigured: async () => {
           if (host !== "claude" || !environment.execution) return false;
           const execution = await resolveExecution(environment.execution);
           const status = await inspectRegistration(

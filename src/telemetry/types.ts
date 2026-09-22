@@ -18,7 +18,7 @@ export const routeTraceSchema = z
     capabilities: z
       .strictObject({ skillInvocationTelemetry: z.literal(true) })
       .describe(
-        "Local observer registration and storage prerequisites checked at routing time; async delivery remains best effort.",
+        "Observer registration and local persistence prerequisites were detected at routing time. Configuration does not confirm host reload, event delivery or complete observation of this turn. Async delivery is best effort; absence of events does not prove non-invocation.",
       )
       .optional(),
     delivery: z

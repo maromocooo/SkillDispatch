@@ -113,20 +113,28 @@ export async function readInvocationIndex(reader: InvocationEventReader) {
   };
 }
 export type InvocationIndex = Awaited<ReturnType<typeof readInvocationIndex>>;
-export function traceInvocationAvailability(
+/** Routing-time local configuration only: neither delivery nor complete observation. */
+export function traceObserverConfigured(trace: RouteTrace): boolean {
+  return (
+    trace.agent === "claude-code" &&
+    trace.capabilities?.skillInvocationTelemetry === true
+  );
+}
+/** Can this snapshot be joined? This does not establish observation completeness. */
+function traceInvocationCorrelationAvailable(
   trace: RouteTrace,
   index: InvocationIndex,
 ): boolean {
   return (
     index.available &&
     trace.agent === "claude-code" &&
-    trace.capabilities?.skillInvocationTelemetry === true &&
     !!trace.host.sessionKey &&
     !!trace.host.promptKey
   );
 }
 function matchingCalls(trace: RouteTrace, index: InvocationIndex): Lifecycle[] {
   if (
+    !index.available ||
     !trace.host.sessionKey ||
     !trace.host.promptKey ||
     trace.agent !== "claude-code"
@@ -140,7 +148,6 @@ function matchingCalls(trace: RouteTrace, index: InvocationIndex): Lifecycle[] {
 }
 /** Privacy-safe display: no HMACs, arguments, response or error text. */
 export function traceInvocations(trace: RouteTrace, index: InvocationIndex) {
-  const available = traceInvocationAvailability(trace, index);
   const calls = matchingCalls(trace, index)
     .map(({ phases, conflict }) => {
       const first = phases.attempted ?? phases.succeeded ?? phases.failed;
@@ -170,30 +177,35 @@ export function traceInvocations(trace: RouteTrace, index: InvocationIndex) {
         compareText(JSON.stringify(a), JSON.stringify(b)),
     );
   return {
-    availability: available ? ("available" as const) : ("unavailable" as const),
+    observerConfigured: traceObserverConfigured(trace),
+    streamReadable: index.available,
+    correlationAvailable: traceInvocationCorrelationAvailable(trace, index),
     calls,
   };
 }
 export interface PairCounts {
   recommended: number;
   injected: number;
-  modelInvoked: number;
-  succeeded: number;
-  injectedModelInvoked: number;
+  observedModelInvoked: number;
+  observedSucceeded: number;
+  /** No exact resolved main-context attempt observed; not proof of non-invocation. */
+  injectedPairsWithoutObservedInvocation: number;
 }
 const empty = (): PairCounts => ({
   recommended: 0,
   injected: 0,
-  modelInvoked: 0,
-  succeeded: 0,
-  injectedModelInvoked: 0,
+  observedModelInvoked: 0,
+  observedSucceeded: 0,
+  injectedPairsWithoutObservedInvocation: 0,
 });
-const rate = (a: number, b: number) => (b ? a / b : null);
-/** Each routing record contributes at most one pair per logical catalog/content identity. */
+/** Positive evidence only; async absence cannot establish a negative or exact conversion.
+ * Each configured routing record contributes at most one pair per logical catalog/content identity.
+ */
 export class AdvisoryFunnel {
   private counts = empty();
-  private availableTraces = 0;
-  private unavailableTraces = 0;
+  private telemetryConfiguredTraces = 0;
+  private telemetryUnconfiguredTraces = 0;
+  private uncorrelatableTraces = 0;
   private uncorrelatablePairs = 0;
   private skills = new Map<
     string,
@@ -202,11 +214,13 @@ export class AdvisoryFunnel {
   constructor(private readonly index: InvocationIndex) {}
   add(trace: RouteTrace): void {
     if (trace.agent !== "claude-code" || trace.mode !== "advisory") return;
-    if (!traceInvocationAvailability(trace, this.index)) {
-      this.unavailableTraces++;
+    if (!traceObserverConfigured(trace)) {
+      this.telemetryUnconfiguredTraces++;
       return;
     }
-    this.availableTraces++;
+    this.telemetryConfiguredTraces++;
+    if (!traceInvocationCorrelationAvailable(trace, this.index))
+      this.uncorrelatableTraces++;
     const calls = matchingCalls(trace, this.index).filter(
       (call) =>
         !call.conflict &&
@@ -250,9 +264,9 @@ export class AdvisoryFunnel {
       const delta = {
         recommended: 1,
         injected: Number(injected),
-        modelInvoked: Number(invoked),
-        succeeded: Number(succeeded),
-        injectedModelInvoked: Number(injected && invoked),
+        observedModelInvoked: Number(invoked),
+        observedSucceeded: Number(succeeded),
+        injectedPairsWithoutObservedInvocation: Number(injected && !invoked),
       };
       const skill = this.skills.get(key) ?? {
         ...empty(),
@@ -271,17 +285,10 @@ export class AdvisoryFunnel {
   result() {
     return {
       ...this.counts,
-      availableTraces: this.availableTraces,
-      unavailableTraces: this.unavailableTraces,
+      telemetryConfiguredTraces: this.telemetryConfiguredTraces,
+      telemetryUnconfiguredTraces: this.telemetryUnconfiguredTraces,
+      uncorrelatableTraces: this.uncorrelatableTraces,
       uncorrelatablePairs: this.uncorrelatablePairs,
-      injectedToModelInvoked: rate(
-        this.counts.injectedModelInvoked,
-        this.counts.injected,
-      ),
-      modelInvokedToSucceeded: rate(
-        this.counts.succeeded,
-        this.counts.modelInvoked,
-      ),
       skills: [...this.skills.values()].sort(
         (a, b) =>
           b.recommended - a.recommended ||

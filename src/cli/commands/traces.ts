@@ -80,8 +80,9 @@ export async function tracesCommand(
       printDetail(result.trace, io);
       if (result.modelInvocations) {
         io.stdout(
-          `Model skill invocations (telemetry ${result.modelInvocations.availability}):\n`,
+          `Invocation observer: ${result.modelInvocations.observerConfigured ? "configured / best-effort" : "not configured / telemetry unavailable"}\nInvocation stream: ${result.modelInvocations.streamReadable ? "readable" : "unavailable"}; correlation: ${result.modelInvocations.correlationAvailable ? "possible" : "unavailable"}\nModel skill invocations observed:${result.modelInvocations.calls.length ? "" : " none"}\n`,
         );
+        io.stdout("Missing events do not prove non-invocation or failure.\n");
         for (const call of result.modelInvocations.calls)
           io.stdout(
             `  ${terminalText(call.nativeInvocationName)} ${call.attempted ? "attempted" : "attempt not observed"} -> ${call.outcome} (${call.executionContext}; ${call.resolved ? "resolved" : "unresolved"})\n`,
@@ -105,7 +106,7 @@ function printSummary(s: TraceSummary, io: CliIO) {
   if (s.advisoryFunnel) {
     const f = s.advisoryFunnel;
     io.stdout(
-      `Advisory funnel (observer-capable same-prompt route-skill pairs):\n  Recommended: ${f.recommended}\n  Injected: ${f.injected}\n  Model invoked: ${f.modelInvoked}\n  Successful invocations: ${f.succeeded}\n  Injected -> Model invoked: ${number(f.injectedToModelInvoked)}\n  Model invoked -> Succeeded: ${number(f.modelInvokedToSucceeded)}\n  Telemetry unavailable traces: ${f.unavailableTraces}\n`,
+      `Advisory / invocation telemetry (observer-configured route-skill pairs):\n  Recommended: ${f.recommended}\n  Injected: ${f.injected}\n  Observed model-invoked: ${f.observedModelInvoked}\n  Observed succeeded: ${f.observedSucceeded}\n  Observer-configured traces: ${f.telemetryConfiguredTraces}\n  Observer-unavailable traces (not configured): ${f.telemetryUnconfiguredTraces}\n  Configured traces without usable correlation: ${f.uncorrelatableTraces}\n  Injected pairs with no observed model invocation: ${f.injectedPairsWithoutObservedInvocation}\n  Async observers provide positive evidence only; missing events remain unknown. Exact conversion rates are not reported.\n`,
     );
     const h = s.invocationHealth;
     if (h)

@@ -27,7 +27,7 @@ interface HookServices {
   getKey: typeof installationKey;
   makeSink: (path: string) => TraceSink;
   canAdvise: () => Promise<boolean>;
-  invocationAvailable: () => Promise<boolean>;
+  invocationObserverConfigured: () => Promise<boolean>;
   buildAdvisory: typeof buildClaudeAdvisory;
 }
 
@@ -45,7 +45,7 @@ export async function runHook(
       getKey: installationKey,
       makeSink: (path) => new JsonlTraceSink(path),
       canAdvise: async () => false,
-      invocationAvailable: async () => false,
+      invocationObserverConfigured: async () => false,
       buildAdvisory: buildClaudeAdvisory,
       ...overrides,
     };
@@ -134,19 +134,20 @@ export async function runHook(
         };
       }
     }
-    let invocationAvailable = false;
+    let invocationObserverConfigured = false;
     if (
       input.agent === "claude-code" &&
       input.promptCorrelationId !== undefined
     ) {
       try {
-        invocationAvailable = await services.invocationAvailable();
+        invocationObserverConfigured =
+          await services.invocationObserverConfigured();
       } catch {
-        /* Availability unknown. */
+        /* Local observer configuration could not be confirmed. */
       }
     }
     const trace = createRouteTrace({
-      ...(invocationAvailable
+      ...(invocationObserverConfigured
         ? { capabilities: { skillInvocationTelemetry: true as const } }
         : {}),
       agent: input.agent,

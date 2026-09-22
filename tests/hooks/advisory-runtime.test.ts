@@ -59,7 +59,7 @@ describe("mode-aware shared runtime", () => {
     "records invocation capability only when confirmed: %s",
     async (available) => {
       const f = await fixture();
-      await f.run({ invocationAvailable: async () => available });
+      await f.run({ invocationObserverConfigured: async () => available });
       const trace = (await f.traces())[0];
       expect(trace?.capabilities).toEqual(
         available ? { skillInvocationTelemetry: true } : undefined,
@@ -75,14 +75,14 @@ describe("mode-aware shared runtime", () => {
   it("omits capability when prompt correlation is unavailable", async () => {
     const f = await fixture();
     delete f.input.promptCorrelationId;
-    await f.run({ invocationAvailable: async () => true });
+    await f.run({ invocationObserverConfigured: async () => true });
     expect((await f.traces())[0]?.capabilities).toBeUndefined();
   });
   it("keeps advisory usable when observer availability check fails", async () => {
     const f = await fixture();
     expect(
       await f.run({
-        invocationAvailable: async () => {
+        invocationObserverConfigured: async () => {
           throw new Error("PRIVATE");
         },
       }),

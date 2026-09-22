@@ -66,24 +66,23 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
     expect(funnel).toMatchObject({
       recommended: 2,
       injected: 2,
-      modelInvoked: 1,
-      succeeded: 0,
-      injectedToModelInvoked: 0.5,
-      modelInvokedToSucceeded: 0,
+      observedModelInvoked: 1,
+      observedSucceeded: 0,
+      injectedPairsWithoutObservedInvocation: 1,
     });
   });
-  it("counts only injected A in injection conversion", async () => {
+  it("counts the injected subset separately from observed adoption", async () => {
     expect((await summary([event()], [route(["A"])])).funnel).toMatchObject({
       recommended: 2,
       injected: 1,
-      modelInvoked: 1,
-      injectedToModelInvoked: 1,
+      observedModelInvoked: 1,
+      injectedPairsWithoutObservedInvocation: 0,
     });
   });
-  it("does not inflate injected conversion when only a non-injected recommendation is invoked", async () => {
+  it("keeps injected A unknown when only non-injected B has an observed attempt", async () => {
     expect((await summary([event("B")], [route(["A"])])).funnel).toMatchObject({
-      modelInvoked: 1,
-      injectedToModelInvoked: 0,
+      observedModelInvoked: 1,
+      injectedPairsWithoutObservedInvocation: 1,
     });
   });
   it.each(["succeeded", "failed"] as const)(
@@ -94,7 +93,9 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
       const first = await summary([pre, post]);
       const reversed = await summary([post, pre]);
       expect(first.funnel).toEqual(reversed.funnel);
-      expect(first.funnel.succeeded).toBe(phase === "succeeded" ? 1 : 0);
+      expect(first.funnel.observedSucceeded).toBe(
+        phase === "succeeded" ? 1 : 0,
+      );
       expect(traceInvocations(route(), first.index).calls[0]?.outcome).toBe(
         phase,
       );
@@ -111,8 +112,8 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
   });
   it("post-only has observed success but no model-attempt funnel credit", async () => {
     const { funnel, index } = await summary([event("A", "succeeded")]);
-    expect(funnel.modelInvoked).toBe(0);
-    expect(funnel.succeeded).toBe(0);
+    expect(funnel.observedModelInvoked).toBe(0);
+    expect(funnel.observedSucceeded).toBe(0);
     expect(index.health.terminalWithoutAttempt).toBe(1);
   });
   it("dedupes tool+phase events deterministically and counts repeated invocation once per pair", async () => {
@@ -127,7 +128,10 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
       event("A", "succeeded", { toolUseKey: digest("second") }),
     ];
     const { funnel, index } = await summary(many);
-    expect(funnel).toMatchObject({ modelInvoked: 1, succeeded: 1 });
+    expect(funnel).toMatchObject({
+      observedModelInvoked: 1,
+      observedSucceeded: 1,
+    });
     expect(index.health).toMatchObject({
       duplicates: 2,
       attempted: 2,
@@ -142,7 +146,7 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
           event(),
           event("B", "attempted", { toolUseKey: digest("B") }),
         ])
-      ).funnel.modelInvoked,
+      ).funnel.observedModelInvoked,
     ).toBe(2));
   it.each([
     { promptKey: digest("other") },
@@ -150,70 +154,78 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
     { executionContext: { kind: "subagent" as const } },
   ])("does not credit another prompt/session/subagent %#", async (extra) => {
     expect(
-      (await summary([event("A", "attempted", extra)])).funnel.modelInvoked,
+      (await summary([event("A", "attempted", extra)])).funnel
+        .observedModelInvoked,
     ).toBe(0);
   });
   it("uses tool lifecycle correlation when only the terminal event lacks prompt ID", async () => {
     const post = event("A", "succeeded");
     delete post.promptKey;
     expect((await summary([post, event()])).funnel).toMatchObject({
-      modelInvoked: 1,
-      succeeded: 1,
+      observedModelInvoked: 1,
+      observedSucceeded: 1,
     });
     const pre = event();
     delete pre.promptKey;
     expect(
-      (await summary([pre, event("A", "succeeded")])).funnel.modelInvoked,
+      (await summary([pre, event("A", "succeeded")])).funnel
+        .observedModelInvoked,
     ).toBe(0);
   });
   it("missing invocation prompt ID cannot join even within the same session", async () => {
     const noPrompt = event();
     delete noPrompt.promptKey;
     const { index, funnel } = await summary([noPrompt]);
-    expect(funnel.modelInvoked).toBe(0);
+    expect(funnel.observedModelInvoked).toBe(0);
     expect(traceInvocations(route(), index).calls).toEqual([]);
   });
   it("unresolved invocation remains visible without credit", async () => {
     const unresolved = eventFixture();
     const { index, funnel } = await summary([unresolved]);
     expect(index.health.unresolved).toBe(1);
-    expect(funnel.modelInvoked).toBe(0);
+    expect(funnel.observedModelInvoked).toBe(0);
     expect(traceInvocations(route(), index).calls[0]?.resolved).toBe(false);
   });
   it("a changed content version does not match an earlier recommendation", async () => {
     const changed = event();
     if (changed.skill.resolved) changed.skill.contentHash = digest("new");
-    expect((await summary([changed])).funnel.modelInvoked).toBe(0);
+    expect((await summary([changed])).funnel.observedModelInvoked).toBe(0);
   });
-  it("contradictory terminal events are unknown and get no conversion credit", async () => {
+  it("contradictory terminal events are unknown and get no adoption credit", async () => {
     const { index, funnel } = await summary([
       event(),
       event("A", "failed"),
       event("A", "succeeded"),
     ]);
     expect(index.health.conflicting).toBe(1);
-    expect(funnel.modelInvoked).toBe(0);
+    expect(funnel.observedModelInvoked).toBe(0);
     expect(traceInvocations(route(), index).calls[0]?.outcome).toBe("unknown");
   });
   it("conflicting duplicate identifiers do not join", async () => {
     const { index, funnel } = await summary([event(), event("B")]);
     expect(index.health.conflicting).toBe(1);
-    expect(funnel.modelInvoked).toBe(0);
+    expect(funnel.observedModelInvoked).toBe(0);
   });
-  it("old traces, absent correlation and unreadable storage are unavailable with null ratios", async () => {
+  it("distinguishes old unconfigured traces from configured but uncorrelatable records", async () => {
     const old = route();
     delete old.capabilities;
     const noPrompt = route();
     delete noPrompt.host.promptKey;
     const { index, funnel } = await summary([event()], [old, noPrompt]);
     expect(funnel).toMatchObject({
-      availableTraces: 0,
-      unavailableTraces: 2,
-      recommended: 0,
-      injectedToModelInvoked: null,
-      modelInvokedToSucceeded: null,
+      telemetryConfiguredTraces: 1,
+      telemetryUnconfiguredTraces: 1,
+      uncorrelatableTraces: 1,
+      recommended: 2,
+      injected: 2,
+      observedModelInvoked: 0,
     });
-    expect(traceInvocations(old, index).availability).toBe("unavailable");
+    expect(traceInvocations(old, index).observerConfigured).toBe(false);
+    expect(traceInvocations(noPrompt, index)).toMatchObject({
+      observerConfigured: true,
+      correlationAvailable: false,
+      calls: [],
+    });
     const broken = await readInvocationIndex({
       async *read() {
         yield { kind: "valid" as const, line: 1, trace: event() };
@@ -222,7 +234,118 @@ describe("invocation lifecycle and same-prompt advisory funnel", () => {
     });
     const f = new AdvisoryFunnel(broken);
     f.add(route());
-    expect(f.result().unavailableTraces).toBe(1);
+    expect(f.result()).toMatchObject({
+      telemetryConfiguredTraces: 1,
+      telemetryUnconfiguredTraces: 0,
+      uncorrelatableTraces: 1,
+      recommended: 2,
+      observedModelInvoked: 0,
+    });
+    expect(traceInvocations(route(), broken)).toMatchObject({
+      observerConfigured: true,
+      streamReadable: false,
+      correlationAvailable: false,
+      calls: [],
+    });
+  });
+  it("configured registration with no events proves neither host reload nor non-invocation", async () => {
+    const r = route(["A"]);
+    r.decisions = r.decisions.filter((d) => d.name === "A");
+    const { index, funnel } = await summary([], [r]);
+    expect(funnel).toMatchObject({
+      recommended: 1,
+      injected: 1,
+      observedModelInvoked: 0,
+      observedSucceeded: 0,
+      injectedPairsWithoutObservedInvocation: 1,
+      telemetryConfiguredTraces: 1,
+      telemetryUnconfiguredTraces: 0,
+    });
+    expect(traceInvocations(r, index)).toEqual({
+      observerConfigured: true,
+      streamReadable: true,
+      correlationAvailable: true,
+      calls: [],
+    });
+    expect(Object.keys(funnel).sort()).toEqual(
+      [
+        "recommended",
+        "injected",
+        "observedModelInvoked",
+        "observedSucceeded",
+        "injectedPairsWithoutObservedInvocation",
+        "telemetryConfiguredTraces",
+        "telemetryUnconfiguredTraces",
+        "uncorrelatableTraces",
+        "uncorrelatablePairs",
+        "skills",
+      ].sort(),
+    );
+    expect(Object.keys(funnel.skills[0] ?? {}).sort()).toEqual(
+      [
+        "recommended",
+        "injected",
+        "observedModelInvoked",
+        "observedSucceeded",
+        "injectedPairsWithoutObservedInvocation",
+        "name",
+        "catalogIdentity",
+        "contentHash",
+      ].sort(),
+    );
+  });
+  it("async loss of B and A's terminal leaves unknowns without a 50% conversion or 0% success rate", async () => {
+    const { index, funnel } = await summary([event()]);
+    expect(funnel).toMatchObject({
+      recommended: 2,
+      injected: 2,
+      observedModelInvoked: 1,
+      observedSucceeded: 0,
+      injectedPairsWithoutObservedInvocation: 1,
+    });
+    expect(funnel.skills.find((s) => s.name === "B")).toMatchObject({
+      observedModelInvoked: 0,
+      injectedPairsWithoutObservedInvocation: 1,
+    });
+    expect(traceInvocations(route(), index).calls).toHaveLength(1);
+    expect(traceInvocations(route(), index).calls[0]?.outcome).toBe("unknown");
+    for (const removed of [
+      "notInvoked",
+      "injectedToModelInvoked",
+      "modelInvokedToSucceeded",
+      "successRate",
+    ])
+      expect(JSON.stringify(funnel)).not.toContain(removed);
+    expect(index.health.failed).toBe(0);
+  });
+  it("positive succeeded evidence updates counts without changing configuration or reporting rates", async () => {
+    const pre = event();
+    const before = (await summary([pre])).funnel;
+    const after = (await summary([event("A", "succeeded"), pre])).funnel;
+    expect(after.telemetryConfiguredTraces).toBe(
+      before.telemetryConfiguredTraces,
+    );
+    expect(after.observedModelInvoked).toBe(1);
+    expect(after.observedSucceeded).toBe(1);
+    expect(after.injectedPairsWithoutObservedInvocation).toBe(1);
+    expect(after).not.toHaveProperty("modelInvokedToSucceeded");
+    expect(after).not.toHaveProperty("injectedToModelInvoked");
+  });
+  it("old unconfigured traces stay outside adoption counts even with matching events", async () => {
+    const old = route();
+    delete old.capabilities;
+    const { funnel } = await summary([event(), event("A", "succeeded")], [old]);
+    expect(funnel).toMatchObject({
+      telemetryConfiguredTraces: 0,
+      telemetryUnconfiguredTraces: 1,
+      recommended: 0,
+      injected: 0,
+      observedModelInvoked: 0,
+      observedSucceeded: 0,
+      injectedPairsWithoutObservedInvocation: 0,
+      skills: [],
+    });
+    expect(funnel).not.toHaveProperty("notInvoked");
   });
   it("dedupes repeated logical identity within a route, preserving injected state", async () => {
     const r = route([]);
