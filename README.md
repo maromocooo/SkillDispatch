@@ -220,6 +220,9 @@ conservatively marked non-routable with `ambiguous_synced_skill`: there is no
 public local active-account selector, so SkillDispatch does not guess a winner.
 Identical duplicate versions collapse; differing content stays visible for review.
 This is an offline cache snapshot, not proof of current account/session availability.
+`syncClaudeAiSkills: false` in user, local or file-managed settings suppresses this
+source even if a later file sets true. Shared project settings cannot disable it;
+true never forces syncing on. Session `--settings` values are not observable here.
 
 Plugin state resolution requires version-2 `installed_plugins.json` records and
 a valid installed manifest or registered marketplace definition (`strict: false`).

@@ -6,6 +6,12 @@ import { claudeDiagnostic, readClaudeJson } from "./claude-files.js";
 import { isMissing } from "./filesystem.js";
 import type { DiscoveryContext } from "./types.js";
 
+type ClaudeSettingSource = "user" | "project" | "local" | "managed";
+interface ClaudeSettingsLocation {
+  source: ClaudeSettingSource;
+  path: string;
+}
+
 export interface ClaudeCatalogSettings {
   valid: boolean;
   enabledPlugins: Map<string, boolean>;
@@ -36,10 +42,10 @@ export async function loadClaudeCatalogSettings(
     syncClaudeAiSkills: true,
     strictPluginOnlyCustomization: false,
   };
-  const paths = [
-    join(configRoot, "settings.json"),
-    join(context.cwd, ".claude/settings.json"),
-    join(context.cwd, ".claude/settings.local.json"),
+  const locations: ClaudeSettingsLocation[] = [
+    { source: "user", path: join(configRoot, "settings.json") },
+    { source: "project", path: join(context.cwd, ".claude/settings.json") },
+    { source: "local", path: join(context.cwd, ".claude/settings.local.json") },
   ];
   const repo = directories.at(-1);
   // Current macOS/Linux native local settings live at the owned repository root.
@@ -58,10 +64,17 @@ export async function loadClaudeCatalogSettings(
         if (!isMissing(error)) owned = false;
       }
     }
-    if (owned) paths.push(join(repo, ".claude/settings.local.json"));
+    if (owned)
+      locations.push({
+        source: "local",
+        path: join(repo, ".claude/settings.local.json"),
+      });
   }
   if (managedDirectory) {
-    paths.push(join(managedDirectory, "managed-settings.json"));
+    locations.push({
+      source: "managed",
+      path: join(managedDirectory, "managed-settings.json"),
+    });
     try {
       const root = join(managedDirectory, "managed-settings.d");
       if (!(await lstat(root)).isDirectory()) throw new Error();
@@ -72,7 +85,14 @@ export async function loadClaudeCatalogSettings(
         if (!entry.name.startsWith(".") && entry.name.endsWith(".json"))
           names.push(entry.name);
       }
-      paths.push(...names.sort(compareText).map((name) => join(root, name)));
+      locations.push(
+        ...names.sort(compareText).map(
+          (name): ClaudeSettingsLocation => ({
+            source: "managed",
+            path: join(root, name),
+          }),
+        ),
+      );
     } catch (error) {
       if (!isMissing(error)) {
         settings.valid = false;
@@ -80,7 +100,7 @@ export async function loadClaudeCatalogSettings(
       }
     }
   }
-  for (const path of [...new Set(paths)]) {
+  for (const { path, source } of locations) {
     const count = diagnostics.length;
     const data = await readClaudeJson(
       path,
@@ -109,13 +129,18 @@ export async function loadClaudeCatalogSettings(
           }
         }
       }
-      for (const field of [
-        "syncClaudeAiSkills",
-        "strictPluginOnlyCustomization",
-      ] as const) {
-        if (data[field] === undefined) continue;
-        if (typeof data[field] !== "boolean") throw new Error();
-        settings[field] = data[field];
+      // This opt-out is restrictive, not a highest-precedence boolean. Shared
+      // project files cannot opt the user out; true never clears an earlier false.
+      if (source !== "project" && data.syncClaudeAiSkills !== undefined) {
+        if (typeof data.syncClaudeAiSkills !== "boolean") throw new Error();
+        if (data.syncClaudeAiSkills === false)
+          settings.syncClaudeAiSkills = false;
+      }
+      if (data.strictPluginOnlyCustomization !== undefined) {
+        if (typeof data.strictPluginOnlyCustomization !== "boolean")
+          throw new Error();
+        settings.strictPluginOnlyCustomization =
+          data.strictPluginOnlyCustomization;
       }
     } catch {
       settings.valid = false;
