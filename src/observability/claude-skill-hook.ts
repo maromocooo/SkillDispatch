@@ -11,6 +11,7 @@ import {
 } from "../discovery/claude-origin.js";
 import type { RuntimeEnvironment } from "../runtime/context.js";
 import { keyedHash } from "../telemetry/privacy.js";
+import { openPrivateFile } from "../telemetry/reader.js";
 import {
   dataDirectory,
   installationKey,
@@ -80,7 +81,7 @@ export function createInvocationEvent(
     toolUseKey: keyedHash(
       key,
       "tool-use",
-      `claude-code\0${input.session_id}\0${input.tool_use_id}`,
+      JSON.stringify(["claude-code", input.session_id, input.tool_use_id]),
     ),
     skill: skill
       ? {
@@ -134,6 +135,13 @@ export async function observeClaudeSkill(
     if (!config.telemetry.enabled) return;
     const directory = dataDirectory(environment);
     const key = await installationKey(directory);
+    const keyFile = await openPrivateFile(join(directory, "install.key"));
+    if (!keyFile) return;
+    try {
+      if ((await keyFile.stat()).size !== 32) return;
+    } finally {
+      await keyFile.close();
+    }
     let skills: SkillDescriptor[] = [],
       available = true;
     try {

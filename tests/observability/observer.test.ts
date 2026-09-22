@@ -8,6 +8,8 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import { fullFormats } from "ajv-formats/dist/formats.js";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { MAX_HOOK_INPUT_BYTES, readHookJson } from "../../src/hooks/stdin.js";
@@ -29,7 +31,7 @@ import {
 import { dataDirectory } from "../../src/telemetry/storage.js";
 import { createRouteTrace } from "../../src/telemetry/trace.js";
 import { skillText, workspace, write } from "../helpers.js";
-import { traceInput } from "../telemetry/helpers.js";
+import { skill, traceInput } from "../telemetry/helpers.js";
 
 async function collect<T>(input: AsyncIterable<T>): Promise<T[]> {
   const values: T[] = [];
@@ -40,6 +42,61 @@ async function collect<T>(input: AsyncIterable<T>): Promise<T[]> {
 import { eventFixture, hostInput } from "./helpers.js";
 
 describe("Claude Skill observer input and privacy", () => {
+  it.each(["anthropic-skills:pdf", "codex:codex-cli-runtime"])(
+    "resolves exact native namespace %s without alias guesses",
+    (native) => {
+      const synced = native.startsWith("anthropic-skills:");
+      const item = skill("Display name", {
+        agent: "claude-code",
+        scope: "user",
+        metadata: {
+          commandName: native,
+          claude: {
+            origin: synced ? "synced" : "plugin",
+            nativeInvocationName: native,
+            modelInvocable: true,
+            ...(synced
+              ? {}
+              : {
+                  pluginName: "codex",
+                  pluginId: "openai-codex@fixture",
+                  pluginVersion: "1",
+                }),
+          },
+        },
+      });
+      const input = parseSkillHook(
+        hostInput({ tool_input: { skill: native } }),
+      );
+      if (!input) throw new Error();
+      expect(
+        createInvocationEvent(input, Buffer.alloc(32, 1), [item]).skill,
+      ).toMatchObject({
+        resolved: true,
+        name: "Display name",
+        nativeInvocationName: native,
+      });
+      const ambiguous = createInvocationEvent(input, Buffer.alloc(32, 1), [
+        item,
+        { ...item, id: "b".repeat(64) },
+      ]);
+      expect(ambiguous.skill.resolved).toBe(false);
+      expect(ambiguous.diagnosticCode).toBe("ambiguous_skill_invocation");
+      input.tool_input.skill = native.split(":")[1] ?? "invalid";
+      expect(
+        createInvocationEvent(input, Buffer.alloc(32, 1), [item]).skill
+          .resolved,
+      ).toBe(false);
+    },
+  );
+  it("isolates tool id tuple boundaries", () => {
+    expect(
+      eventFixture({ session_id: "a\0b", tool_use_id: "c" }).toolUseKey,
+    ).not.toBe(
+      eventFixture({ session_id: "a", tool_use_id: "b\0c" }).toolUseKey,
+    );
+  });
+
   it.each(invocationEvents)("projects %s without private values", (event) => {
     const input = parseSkillHook(
       hostInput({
@@ -261,6 +318,25 @@ describe("invocation storage safety", () => {
       },
     });
     expect(await collect(new InvocationReader(path, []).read())).toEqual([]);
+  });
+  it("events validate against the shipped JSON Schema and reject private extras", async () => {
+    const ajv = new Ajv2020({ strict: true });
+    ajv.addFormat("uuid", fullFormats.uuid);
+    ajv.addFormat("date-time", fullFormats["date-time"]);
+    const validate = ajv.compile(
+      JSON.parse(
+        await readFile("schemas/skill-invocation.schema.json", "utf8"),
+      ),
+    );
+    expect(validate(eventFixture())).toBe(true);
+    for (const extra of [
+      { args: "PRIVATE" },
+      { tool_response: {} },
+      { error: "PRIVATE" },
+      { cwd: "/PRIVATE" },
+      { session_id: "PRIVATE" },
+    ])
+      expect(validate({ ...eventFixture(), ...extra })).toBe(false);
   });
   it("shipped schema matches runtime schema", async () => {
     expect(

@@ -64,6 +64,13 @@ export class JsonlInvocationSink implements InvocationSink {
           (before && (info.ino !== before.ino || info.dev !== before.dev))
         )
           return;
+        const after = await lstat(this.path);
+        if (
+          after.isSymbolicLink() ||
+          after.dev !== info.dev ||
+          after.ino !== info.ino
+        )
+          return;
         assertPrivate(info);
         await checkPrivateDirectory(dirname(this.path));
         await file.write(line); // One append; no retry of partial writes.
