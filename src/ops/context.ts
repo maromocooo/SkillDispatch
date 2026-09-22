@@ -1,5 +1,7 @@
 import { join } from "node:path";
 import { loadConfig } from "../config/load.js";
+import { InvocationReader } from "../observability/invocation-storage.js";
+import { invocationStorageContext } from "../observability/readiness.js";
 import type { RuntimeEnvironment } from "../runtime/context.js";
 import { JsonlTraceReader } from "../telemetry/reader.js";
 import { dataDirectory, tracePath } from "../telemetry/storage.js";
@@ -16,7 +18,12 @@ export async function loadOperations(environment: RuntimeEnvironment) {
     join(directory, "install.key"),
     join(environment.home, ".config/skilldispatch/config.yaml"),
   ];
+  const invocation = await invocationStorageContext(environment);
   return {
+    invocationReader: new InvocationReader(invocation.path, [
+      ...invocation.protectedPaths,
+      path,
+    ]),
     config,
     diagnostics,
     directory,

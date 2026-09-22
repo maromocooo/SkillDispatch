@@ -1,4 +1,11 @@
 import { compareText } from "../core/order.js";
+import {
+  AdvisoryFunnel,
+  type InvocationEventReader,
+  type InvocationIndex,
+  readInvocationIndex,
+  traceInvocations,
+} from "../observability/invocation-analytics.js";
 import type { TraceReader } from "./reader.js";
 import { type RouteTrace, routeTraceSchema } from "./types.js";
 import {
@@ -107,8 +114,12 @@ function percentile(
 export async function summarizeTraces(
   reader: TraceReader,
   filter: TraceFilter = {},
+  invocationIndex?: InvocationIndex,
 ) {
   const counts = emptyCounts();
+  const funnel = invocationIndex
+    ? new AdvisoryFunnel(invocationIndex)
+    : undefined;
   const agents = { codex: 0, "claude-code": 0 };
   const modes = { shadow: 0, advisory: 0 };
   const advisory = { recommendedCount: 0, injectedCount: 0 };
@@ -119,6 +130,7 @@ export async function summarizeTraces(
   const skills = new Map<string, SkillStatistic>();
   let totalSelected = 0;
   for await (const trace of matching(reader, counts, filter)) {
+    funnel?.add(trace);
     agents[trace.agent]++;
     modes[trace.mode]++;
     if (trace.mode === "advisory") {
@@ -175,6 +187,12 @@ export async function summarizeTraces(
     outcomes,
     modes,
     advisory,
+    ...(funnel
+      ? {
+          advisoryFunnel: funnel.result(),
+          invocationHealth: invocationIndex?.health,
+        }
+      : {}),
     providers: [...providers]
       .sort(([a], [b]) => compareText(a, b))
       .map(([provider, count]) => ({ provider, count })),
@@ -216,16 +234,34 @@ export async function listTraces(
   }
   return { version: 1 as const, ...counts, traces };
 }
-export async function showTrace(reader: TraceReader, id: string) {
+export async function showTrace(
+  reader: TraceReader,
+  id: string,
+  invocationReader?: InvocationEventReader,
+) {
   if (!routeTraceSchema.shape.traceId.safeParse(id).success)
     throw new Error("Trace ID must be a complete UUID.");
   let found: TraceDetailView | undefined;
+  let correlation: RouteTrace | undefined;
   const counts = emptyCounts();
   for await (const trace of matching(reader, counts, {})) {
     if (trace.traceId.toLowerCase() !== id.toLowerCase()) continue;
     if (found) throw new Error("Duplicate trace ID: dataset is corrupt.");
     found = traceDetailView(trace);
+    correlation = trace;
   }
   if (!found) throw new Error("Trace not found.");
-  return { version: 1 as const, ...counts, trace: found };
+  const invocations =
+    invocationReader && correlation
+      ? traceInvocations(
+          correlation,
+          await readInvocationIndex(invocationReader),
+        )
+      : undefined;
+  return {
+    version: 1 as const,
+    ...counts,
+    trace: found,
+    ...(invocations ? { modelInvocations: invocations } : {}),
+  };
 }

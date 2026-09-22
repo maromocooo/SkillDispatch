@@ -1,3 +1,4 @@
+import { readInvocationIndex } from "../../observability/invocation-analytics.js";
 import { loadOperations } from "../../ops/context.js";
 import {
   listTraces,
@@ -41,7 +42,11 @@ export async function tracesCommand(
       : { sinceMs: parseSince(options.since, nowMs) }),
   };
   if (command === "summary") {
-    const result = await summarizeTraces(context.reader, filter);
+    const result = await summarizeTraces(
+      context.reader,
+      filter,
+      await readInvocationIndex(context.invocationReader),
+    );
     if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
     else printSummary(result, io);
   } else if (command === "list") {
@@ -65,9 +70,24 @@ export async function tracesCommand(
       );
     }
   } else {
-    const result = await showTrace(context.reader, id ?? "");
+    const result = await showTrace(
+      context.reader,
+      id ?? "",
+      context.invocationReader,
+    );
     if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
-    else printDetail(result.trace, io);
+    else {
+      printDetail(result.trace, io);
+      if (result.modelInvocations) {
+        io.stdout(
+          `Model skill invocations (telemetry ${result.modelInvocations.availability}):\n`,
+        );
+        for (const call of result.modelInvocations.calls)
+          io.stdout(
+            `  ${terminalText(call.nativeInvocationName)} ${call.attempted ? "attempted" : "attempt not observed"} -> ${call.outcome} (${call.executionContext}; ${call.resolved ? "resolved" : "unresolved"})\n`,
+          );
+      }
+    }
   }
 }
 const number = (value: number | null) =>
@@ -82,6 +102,17 @@ function printSummary(s: TraceSummary, io: CliIO) {
   io.stdout(
     `Modes: shadow ${s.modes.shadow}; advisory ${s.modes.advisory}\nAdvisory recommendations: ${s.advisory.recommendedCount}; injected: ${s.advisory.injectedCount}\n`,
   );
+  if (s.advisoryFunnel) {
+    const f = s.advisoryFunnel;
+    io.stdout(
+      `Advisory funnel (observer-capable same-prompt route-skill pairs):\n  Recommended: ${f.recommended}\n  Injected: ${f.injected}\n  Model invoked: ${f.modelInvoked}\n  Successful invocations: ${f.succeeded}\n  Injected -> Model invoked: ${number(f.injectedToModelInvoked)}\n  Model invoked -> Succeeded: ${number(f.modelInvokedToSucceeded)}\n  Telemetry unavailable traces: ${f.unavailableTraces}\n`,
+    );
+    const h = s.invocationHealth;
+    if (h)
+      io.stdout(
+        `Invocation stream: ${h.available ? "readable" : "unavailable"}; valid ${h.validEvents}; invalid ${h.invalidLines}; attempted-only (unknown) ${h.attemptedOnly}; unresolved model invocations ${h.unresolved}\n`,
+      );
+  }
   io.stdout(
     `Average selected skills: ${number(s.averageSelectedSkills)}\nP50 latency ms: ${number(s.p50LatencyMs)}\nP95 latency ms: ${number(s.p95LatencyMs)}\nProviders:\n`,
   );

@@ -912,3 +912,16 @@ three `Skill` observers together. Observers always use `async: true`; advisory
 `doctor` checks `skill_invocation_telemetry_ready` independently of advisory.
 Observer persistence uses user configuration only, even if project routing
 configuration was explicitly trusted. It never invokes Jev.
+
+`skilldispatch traces summary` now reports an advisory funnel; `traces show <id>`
+shows same-prompt model Skill lifecycles. **Recommended ≠ injected ≠ model-invoked
+≠ succeeded**. Success means the native Skill tool completed, not that Claude
+followed the skill or improved the task outcome. Direct user `/skillname`
+invocations use a separate host path and are not model adoption.
+
+Conversions count route × logical skill-version pairs, only for Claude advisory
+traces with confirmed local observer capability and exact session/prompt keys.
+Old traces are **telemetry unavailable**, not negative examples. Attempts without
+a terminal event remain unknown; async hooks can be terminated with the host.
+Subagent-marked events remain visible separately and do not count as main-turn
+adoption. No transcript parsing or online calls are used to fill gaps.
