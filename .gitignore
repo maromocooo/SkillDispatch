@@ -6,3 +6,11 @@ coverage/
 .env
 .env.*
 .skilldispatch.yaml
+
+# Local-only runtime data and release artifacts
+traces.jsonl
+invocations.jsonl
+install.key
+artifacts/
+*.local.json
+*.log

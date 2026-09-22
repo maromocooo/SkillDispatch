@@ -1,7 +1,7 @@
 {
   "name": "skilldispatch",
-  "version": "0.1.0-dev.1",
-  "description": "Universal, observable skill routing for coding agents.",
+  "version": "0.1.0",
+  "description": "Observable multi-skill routing for Claude Code and Codex.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -21,9 +21,12 @@
   "files": [
     "dist",
     "schemas",
-    "examples",
+    "examples/demo",
+    "examples/*.yaml",
     "evals",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -54,5 +57,24 @@
   },
   "bin": {
     "skilldispatch": "dist/cli/index.js"
+  },
+  "homepage": "https://github.com/maromocooo/SkillDispatch#readme",
+  "bugs": {
+    "url": "https://github.com/maromocooo/SkillDispatch/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agent-skills",
+    "skill-routing",
+    "jev",
+    "observability",
+    "developer-tools"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

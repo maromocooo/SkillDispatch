@@ -51,7 +51,7 @@ export function createProgram(
   common(
     program
       .command("discover")
-      .description("Discover local skills and diagnostics"),
+      .description("Discover local/native skill catalogs and safe diagnostics"),
   ).action((options) => discoverCommand(options, environment, io));
   routingOptions(
     program
@@ -80,7 +80,7 @@ export function createProgram(
   const hook = program
     .command("hook")
     .description(
-      "Run a fail-open UserPromptSubmit hook (shadow by default; Claude advisory opt-in)",
+      "Host stdin entrypoints: routing and local Skill observers (fail-open)",
     );
   for (const host of ["codex", "claude"] as const)
     hook
@@ -178,5 +178,22 @@ export function createProgram(
     .action((id, options) =>
       tracesCommand("show", id, options, environment, io),
     );
+  program.addHelpText(
+    "after",
+    `
+Examples:
+  skilldispatch doctor
+  skilldispatch discover --agent claude-code
+  skilldispatch route "Review this change and add tests"
+  skilldispatch hooks install claude --dry-run
+  skilldispatch hooks install codex
+  skilldispatch traces summary --since 24h
+  skilldispatch eval evals.yaml --json
+
+Shadow is the default. Claude advisory requires user configuration.
+Jev routing requires TYPESAFE_API_KEY; doctor/status/analytics are offline.
+See https://github.com/maromocooo/SkillDispatch#quick-start
+`,
+  );
   return program;
 }
