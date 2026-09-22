@@ -24,6 +24,7 @@ async function run(ctx: CliEnvironment, args: string[], input = "") {
     await createProgram(
       ctx,
       {
+        terminal: { isTTY: true, columns: 80, noColor: true, term: "dumb" },
         stdout: (t) => {
           stdout += t;
         },
@@ -124,7 +125,8 @@ describe("Claude advisory CLI", () => {
       }
     }
     const shown = await run(ctx, ["traces", "show", records[2].traceId]);
-    expect(shown.stdout).toContain("Injected recommendations");
+    expect(shown.stdout).toContain("Recommendation summary");
+    expect(shown.stdout).toContain("Injected: 1");
     const detail = JSON.parse(
       (await run(ctx, ["traces", "show", records[2].traceId, "--json"])).stdout,
     );

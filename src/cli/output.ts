@@ -3,6 +3,15 @@ import type { Diagnostic } from "../core/types.js";
 export interface CliIO {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  terminal?: TerminalContext;
+}
+
+/** Captured at the CLI boundary, never read from the process by renderers. */
+export interface TerminalContext {
+  isTTY: boolean;
+  columns?: number | undefined;
+  noColor?: boolean;
+  term?: string | undefined;
 }
 
 /** Keep untrusted skill metadata from controlling the terminal. JSON preserves data. */

@@ -193,11 +193,13 @@ describe("operational trace CLI", () => {
           expect(show.stdout).toContain("Model skill invocations observed:");
           if (phase === "none")
             expect(show.stdout).toContain(
-              "Model skill invocations observed: none",
+              "No model skill invocation event observed.",
             );
           else
-            expect(show.stdout).toContain(
-              `react attempted -> ${phase === "attempted" ? "unknown" : phase}`,
+            expect(show.stdout).toMatch(
+              new RegExp(
+                `react\\s+\\| yes\\s+\\| ${phase === "attempted" ? "unknown" : phase}`,
+              ),
             );
         }
       }

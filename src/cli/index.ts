@@ -37,6 +37,16 @@ try {
     {
       stdout: (text) => process.stdout.write(text),
       stderr: (text) => process.stderr.write(text),
+      ...(!hookInvocation
+        ? {
+            terminal: {
+              isTTY: process.stdout.isTTY === true,
+              columns: process.stdout.columns,
+              noColor: process.env.NO_COLOR !== undefined,
+              term: process.env.TERM,
+            },
+          }
+        : {}),
     },
   );
   await program.parseAsync(process.argv);

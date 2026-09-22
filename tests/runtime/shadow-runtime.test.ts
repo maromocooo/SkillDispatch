@@ -27,6 +27,8 @@ beforeAll(async () => {
     banner: {
       js: 'import { createRequire as testRequire } from "node:module"; const require = testRequire(import.meta.url);',
     },
+    // Deliberately omit the text renderer's string-width dependency: hook-only
+    // execution must not load it, even in a standalone bundle without node_modules.
     noExternal: [
       "@typesafe-ai/sdk",
       "zod",

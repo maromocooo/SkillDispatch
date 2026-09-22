@@ -10,8 +10,16 @@ third-party code is intended.
 | commander | 13.1.0 | MIT |
 | jsonc-parser | 3.3.1 | MIT |
 | smol-toml | 1.8.0 | BSD-3-Clause |
+| string-width | 8.2.0 | MIT |
 | yaml | 2.9.1 | ISC |
 | zod | 4.6.5 | MIT |
+
+`string-width` measures sanitized terminal text, including East Asian characters
+and combining marks. Its ESM package supports Node 20+; it is used only by the CLI
+renderer. Its installed runtime dependencies are `get-east-asian-width` 1.7.0,
+`strip-ansi` 7.2.0 and `ansi-regex` 6.3.0 (all MIT). Their installed license files
+were included in this audit. SkillDispatch does not import these transitive
+dependencies directly. See the [upstream usage and width rules](https://github.com/sindresorhus/string-width).
 
 Runtime dependencies remain external in the built package and are installed as
 separate npm packages, retaining their own license files. SDK 0.6.0 declares no
