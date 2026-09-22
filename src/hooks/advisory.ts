@@ -7,6 +7,7 @@ import {
   claudeInvocationName,
   claudeModelInvocationAllowed,
 } from "../discovery/claude-invocation.js";
+import { invocationIdentity } from "../discovery/claude-origin.js";
 
 export const MAX_ADVISORY_BYTES = 4096;
 const introduction =
@@ -23,7 +24,10 @@ export function buildClaudeAdvisory(
   const counts = new Map<string, number>();
   for (const skill of catalog) {
     const name = claudeInvocationName(skill);
-    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    if (name) {
+      const key = invocationIdentity(name);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
   }
   const diagnostics: Diagnostic[] = [];
   const injectedSkillIds: string[] = [];
@@ -47,7 +51,7 @@ export function buildClaudeAdvisory(
       skip("advisory_invocation_disabled", skill.id);
       continue;
     }
-    if (counts.get(name) !== 1) {
+    if (counts.get(invocationIdentity(name)) !== 1) {
       skip("advisory_ambiguous_skill_invocation", skill.id);
       continue;
     }

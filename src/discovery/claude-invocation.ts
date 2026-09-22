@@ -11,13 +11,26 @@ export function parseClaudeBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-/** Local, directly discovered personal/project commands only. Never use display names. */
+/** Adapter-derived local/synced/plugin identifiers only. Never guess from display labels. */
 export function claudeInvocationName(
   skill: SkillDescriptor,
 ): string | undefined {
-  if (skill.agent !== "claude-code" || !["repo", "user"].includes(skill.scope))
+  if (
+    skill.agent !== "claude-code" ||
+    !["repo", "user", "admin"].includes(skill.scope)
+  )
     return;
   const claude = claudeMetadata(skill);
+  if (claude?.origin === "plugin") {
+    const name = claude.nativeInvocationName;
+    const prefix = `${claude.pluginName}:`;
+    return safeInvocationSegment(claude.pluginName) &&
+      name?.startsWith(prefix) &&
+      safeInvocationSegment(name.slice(prefix.length)) &&
+      skill.metadata.commandName === name
+      ? name
+      : undefined;
+  }
   if (claude?.origin === "synced") {
     const name = claude.nativeInvocationName;
     const segment = name?.slice("anthropic-skills:".length);
@@ -46,6 +59,7 @@ export function claudeModelInvocationAllowed(skill: SkillDescriptor): boolean {
   const declared = skill.metadata["disable-model-invocation"];
   return (
     skill.enabled &&
+    claudeMetadata(skill)?.modelInvocable !== false &&
     (declared === undefined || parseClaudeBoolean(declared) === false)
   );
 }

@@ -28,6 +28,7 @@ try {
       env: {
         CODEX_HOME: process.env.CODEX_HOME,
         CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+        CLAUDE_CODE_PLUGIN_CACHE_DIR: process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR,
         TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
         SKILLDISPATCH_DATA_DIR: process.env.SKILLDISPATCH_DATA_DIR,
         XDG_DATA_HOME: process.env.XDG_DATA_HOME,

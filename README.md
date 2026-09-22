@@ -228,6 +228,15 @@ scanned. Malformed state and ambiguous applicable versions are diagnosed and
 excluded. `CLAUDE_CODE_PLUGIN_CACHE_DIR` overrides the **plugins parent**, not only
 its cache. No host commands, installation or enablement mutations are performed.
 
+Active plugin skills load only from registry installation roots (`skills/` and safe
+manifest-declared skill directories), with `plugin-name:<frontmatter-name>` or a
+directory-name fallback, per current Claude docs. Personal/project names still use
+the directory. `metadata.claude` records origin separately from scope. Manual-only
+skills remain discoverable but cannot become routing/advisory candidates. Explicit
+`skillOverrides` restrictions apply to non-plugin skills; plugin enablement is
+controlled by `enabledPlugins` instead. File-based managed settings and enterprise
+skill roots are supported read-only; MDM/server/session overrides are not inferred.
+
 Boundaries and limitations:
 
 - Git repositories, worktrees and submodules use the nearest `.git` directory or
@@ -244,7 +253,7 @@ Boundaries and limitations:
 - Codex system roots are explicit library options because installation paths
   vary. Plugin caches and old repository `.codex/skills` are not guessed.
 - PR1 does not reproduce session state, repository trust, managed restrictions,
-  Claude `skillOverrides`, plugin state, legacy commands, `--add-dir`,
+  CLI/session setting overrides, legacy commands, `--add-dir`,
   or skills activated later by file access. It is a local catalog, not telemetry
   of which skills a host actually loaded or invoked.
 - Only Codex user TOML disable entries are read; project/managed config layering
