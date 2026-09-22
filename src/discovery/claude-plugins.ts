@@ -201,6 +201,13 @@ export async function resolveClaudePlugins(
     );
     const primary = records[0];
     if (!primary) continue;
+    const matched = await marketplaceEntry(id);
+    if (matched === false) continue;
+    const entry = matched;
+    if (entry?.strict !== undefined && typeof entry.strict !== "boolean") {
+      claudeDiagnostic(diagnostics, "invalid_plugin_marketplace");
+      continue;
+    }
     const roots = new Set<string>();
     let manifest: z.infer<typeof manifestSchema> | undefined;
     for (const record of records) {
@@ -208,12 +215,37 @@ export async function resolveClaudePlugins(
         const root = await safeDirectory(record.installPath);
         if (roots.has(root)) continue;
         roots.add(root);
+        const before = diagnostics.length;
+        const rawManifest = await readClaudeJson(
+          join(root, ".claude-plugin/plugin.json"),
+          diagnostics,
+          "invalid_plugin_manifest",
+        );
+        if (diagnostics.length !== before) {
+          invalid = true;
+          continue;
+        }
+        if (
+          entry?.strict === false &&
+          rawManifest &&
+          [
+            "skills",
+            "commands",
+            "agents",
+            "hooks",
+            "mcpServers",
+            "outputStyles",
+            "lspServers",
+            "workflows",
+            "experimental",
+          ].some((field) => rawManifest[field] !== undefined)
+        ) {
+          claudeDiagnostic(diagnostics, "plugin_manifest_conflict");
+          invalid = true;
+          continue;
+        }
         const parsed = manifestSchema.safeParse(
-          await readClaudeJson(
-            join(root, ".claude-plugin/plugin.json"),
-            diagnostics,
-            "invalid_plugin_manifest",
-          ),
+          entry?.strict === false ? entry : rawManifest,
         );
         if (!parsed.success) {
           claudeDiagnostic(diagnostics, "invalid_plugin_manifest");
@@ -240,10 +272,6 @@ export async function resolveClaudePlugins(
     }
     if (invalid || !manifest) continue;
     const explicit = settings.enabledPlugins.get(id);
-    // Marketplace component declarations also affect scan roots, not only defaults.
-    const matched = await marketplaceEntry(id);
-    if (matched === false) continue;
-    const entry = matched;
     if (
       entry?.defaultEnabled !== undefined &&
       typeof entry.defaultEnabled !== "boolean"
@@ -261,16 +289,6 @@ export async function resolveClaudePlugins(
       });
       continue;
     }
-    // Component merging / strict:false marketplace-only manifests need host state;
-    // never guess additional component roots from a marketplace source.
-    if (
-      entry?.strict === false ||
-      entry?.source === "." ||
-      entry?.source === "./"
-    ) {
-      claudeDiagnostic(diagnostics, "unsupported_plugin_layout");
-      continue;
-    }
     const declared = z
       .union([z.string(), z.array(z.string()).max(64)])
       .optional()
@@ -281,10 +299,17 @@ export async function resolveClaudePlugins(
     }
     const paths = (value: string | string[] | undefined) =>
       value === undefined ? [] : typeof value === "string" ? [value] : value;
+    const custom = [...paths(manifest.skills), ...paths(declared.data)];
+    const marketplaceRoot = entry?.source === "." || entry?.source === "./";
+    if (marketplaceRoot && !custom.length) {
+      claudeDiagnostic(diagnostics, "unsupported_plugin_layout");
+      continue;
+    }
+    // Marketplace-root plugins declare their complete subset; never broaden it
+    // to every marketplace skill if a selected path has disappeared.
     const skillDirectories = [
-      "./skills",
-      ...paths(manifest.skills),
-      ...paths(declared.data),
+      ...(marketplaceRoot ? [] : ["./skills"]),
+      ...custom,
     ];
     if (
       skillDirectories.some(

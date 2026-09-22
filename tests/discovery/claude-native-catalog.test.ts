@@ -522,6 +522,80 @@ describe("Claude native catalog integration", () => {
       "unsupported_plugin_layout",
     );
   });
+  it.each(["absent", "metadata", "components"])(
+    "resolves a strict:false marketplace definition with %s installed manifest",
+    async (kind) => {
+      const f = await catalogFixture();
+      const market = join(f.plugins, "marketplaces/selected");
+      await write(
+        join(f.plugins, "known_marketplaces.json"),
+        JSON.stringify({ market: { installLocation: market } }),
+      );
+      await write(
+        join(market, ".claude-plugin/marketplace.json"),
+        JSON.stringify({
+          plugins: [
+            { name: "registry-slug", strict: false, skills: "./skills" },
+          ],
+        }),
+      );
+      const manifest = join(f.installed, ".claude-plugin/plugin.json");
+      if (kind === "absent") await rm(manifest);
+      if (kind === "components")
+        await write(manifest, JSON.stringify({ name: "codex", hooks: {} }));
+      const result = await f.run();
+      const plugins = result.skills.filter(
+        (s) => claudeMetadata(s)?.origin === "plugin",
+      );
+      if (kind === "components") {
+        expect(plugins).toEqual([]);
+        expect(result.diagnostics.map((d) => d.code)).toContain(
+          "plugin_manifest_conflict",
+        );
+      } else {
+        expect(plugins.map(claudeInvocationName)).toEqual([
+          "registry-slug:native-name",
+        ]);
+        expect(result.diagnostics.map((d) => d.code)).not.toContain(
+          "invalid_plugin_manifest",
+        );
+      }
+    },
+  );
+  it.each([true, false])(
+    "never broadens a marketplace-root component subset (declared path exists=%s)",
+    async (exists) => {
+      const f = await catalogFixture();
+      const market = join(f.plugins, "marketplaces/selected");
+      await write(
+        join(f.plugins, "known_marketplaces.json"),
+        JSON.stringify({ market: { installLocation: market } }),
+      );
+      await write(
+        join(market, ".claude-plugin/marketplace.json"),
+        JSON.stringify({
+          plugins: [
+            {
+              name: "registry-slug",
+              source: "./",
+              skills: "./skills/selected",
+            },
+          ],
+        }),
+      );
+      if (exists)
+        await write(
+          join(f.installed, "skills/selected/SKILL.md"),
+          skillText("selected"),
+        );
+      const result = await f.run();
+      expect(
+        result.skills
+          .filter((s) => claudeMetadata(s)?.origin === "plugin")
+          .map(claudeInvocationName),
+      ).toEqual(exists ? ["codex:selected"] : []);
+    },
+  );
   it("diagnoses invalid plugin SKILL.md without exposing source path or content", async () => {
     const f = await catalogFixture();
     await write(
