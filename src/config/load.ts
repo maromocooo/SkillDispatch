@@ -6,7 +6,7 @@ import { isMissing } from "../discovery/filesystem.js";
 import { configFileSchema, defaultConfig } from "./schema.js";
 
 export type ConfigSource = "user" | "project" | "explicit";
-export type ConfigMode = "cli" | "hook";
+export type ConfigMode = "cli" | "hook" | "user";
 
 interface ConfigLayer {
   source: ConfigSource;
@@ -29,7 +29,10 @@ export async function loadConfig(options: {
     { source: "project", path: join(options.cwd, ".skilldispatch.yaml") },
   ];
   // Hook configuration authority is user-only. No explicit layer may bypass it.
-  if (options.mode !== "hook" && options.configPath !== undefined)
+  if (
+    (options.mode === undefined || options.mode === "cli") &&
+    options.configPath !== undefined
+  )
     layers.push({
       source: "explicit",
       path: resolve(options.cwd, options.configPath),
@@ -37,8 +40,8 @@ export async function loadConfig(options: {
   for (const { source, path } of layers) {
     if (
       source === "project" &&
-      options.mode === "hook" &&
-      !config.hook.trustProjectConfig
+      (options.mode === "user" ||
+        (options.mode === "hook" && !config.hook.trustProjectConfig))
     )
       continue; // Do not stat, parse or diagnose an untrusted repository's settings.
     let contents: string;
@@ -85,6 +88,16 @@ export async function loadConfig(options: {
           level: "warning",
           message:
             "hook.trustProjectConfig can only be set in user configuration.",
+          path,
+        });
+    }
+    if (file.hook?.modes !== undefined) {
+      if (source === "user") Object.assign(config.hook.modes, file.hook.modes);
+      else
+        diagnostics.push({
+          code: "ignored_config_setting",
+          level: "warning",
+          message: "hook.modes can only be set in user configuration.",
           path,
         });
     }

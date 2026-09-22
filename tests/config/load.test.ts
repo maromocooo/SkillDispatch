@@ -21,7 +21,10 @@ describe("SkillDispatch configuration", () => {
     const ctx = await workspace();
     const { config, diagnostics } = await loadConfig(ctx);
     expect(config).toEqual({
-      hook: { trustProjectConfig: false },
+      hook: {
+        trustProjectConfig: false,
+        modes: { claude: "shadow", codex: "shadow" },
+      },
       telemetry: { enabled: true, prompt: "hash" },
       router: {
         provider: "jev",
