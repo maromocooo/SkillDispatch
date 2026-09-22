@@ -1,5 +1,6 @@
 import { basename, dirname, join } from "node:path";
 import { finalizeCatalog } from "./catalog.js";
+import { parseClaudeBoolean } from "./claude-invocation.js";
 import { projectDirectories } from "./filesystem.js";
 import { scanSources } from "./scan.js";
 import type {
@@ -60,13 +61,4 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
     }
     return finalizeCatalog([result]);
   }
-}
-
-function parseClaudeBoolean(value: unknown): boolean | undefined {
-  if (typeof value === "boolean") return value;
-  if (typeof value !== "string" && typeof value !== "number") return undefined;
-  const normalized = String(value).toLowerCase();
-  if (["true", "yes", "on", "1"].includes(normalized)) return true;
-  if (["false", "no", "off", "0"].includes(normalized)) return false;
-  return undefined;
 }
