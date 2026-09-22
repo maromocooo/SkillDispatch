@@ -4,6 +4,12 @@
 # This opt-in can only be set in ~/.config/skilldispatch/config.yaml:
 # hook:
 #   trustProjectConfig: true
+# Hook execution modes are user-owned even when project config is trusted.
+# User config only (both defaults are shadow):
+# hook:
+#   modes:
+#     claude: advisory  # then run: skilldispatch hooks install claude
+#     codex: shadow    # advisory is not supported for Codex
 router:
   provider: jev
   timeoutMs: 2500

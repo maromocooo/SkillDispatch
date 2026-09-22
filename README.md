@@ -6,10 +6,10 @@ SkillDispatch discovers local coding-agent skills and routes one prompt to **zer
 or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
-**Status:** PR6 development preview: discovery, routing, evaluation, and silent
-shadow hooks with private local JSONL traces, local trace inspection, and safe user-scope
-hook registration. Real Jev routing quality has not been
-established. Advisory injection and Agent Skill Studio are not implemented.
+**Status:** PR7 development preview: discovery, routing, evaluation, private local
+traces, operational CLI, user hook registration, and explicit **Claude advisory**.
+Both hosts default to shadow. Codex remains shadow-only. Real Jev routing quality
+has not been established; native skill invocation is not observed.
 
 ## Install from source
 
@@ -319,12 +319,11 @@ skill pairs to your catalog. No automatic threshold tuning or reranking is added
 
 ## Shadow hooks and local traces
 
-PR4 runs routing for observation only. It never returns `additionalContext`, a
-blocking decision, a reason, or a system message. Both hook commands finish with
-**exit 0 and empty stdout/stderr**, including errors. This preserves host context
-and decisions, but synchronous hooks still add bounded latency. `selected` means
-**recommended by SkillDispatch's policy**, not that the host invoked or followed
-a skill or that output quality improved.
+Shadow mode runs routing for observation only and returns no host context. Both
+hooks default to **exit 0 and empty stdout/stderr**, including errors. Claude can
+explicitly opt into the advisory mode below. `selected` means **recommended by
+SkillDispatch's policy**, not that the host invoked or followed a skill or that
+output quality improved.
 
 ### Quick start: register shadow hooks
 
@@ -338,10 +337,10 @@ a skill or that output quality improved.
    `skilldispatch traces summary` and `skilldispatch traces list`.
 
 Registration is **async shadow by default**: agent processing can proceed while
-routing runs in the background. No context is injected, even with the optional
-`hooks install codex --sync` / `hooks install claude --sync` debug mode. Sync adds
-bounded prompt latency. Repeating install is idempotent; `--sync` updates only
-SkillDispatch's execution mode/timeout. A later install without `--sync` restores async.
+routing runs in the background. Claude shadow has an optional `hooks install claude
+--sync` debug setting, still with empty output; ordinary install restores async.
+Codex installation is async only (`--sync` is rejected in PR7). Repeating install
+is idempotent. Claude advisory installs synchronously as described below.
 
 Use `hooks status [codex|claude] --json` for a read-only report. Omit the host to
 inspect both. `hooks uninstall codex` / `hooks uninstall claude` remove only the
@@ -394,6 +393,87 @@ permissions/trust and host-level disable settings still control execution. Curre
 Claude ordinary async hooks do not enforce the command `timeout` once running;
 SkillDispatch retains its own 4-second process cutoff. No delivery guarantee or
 host async lifecycle emulation is implemented.
+
+### Claude advisory (explicit opt-in)
+
+Edit **user** `~/.config/skilldispatch/config.yaml`, retaining your other settings:
+
+```yaml
+hook:
+  trustProjectConfig: false
+  modes:
+    claude: advisory
+    codex: shadow
+```
+
+Then reconcile the existing registration and reload/restart Claude as needed:
+
+```sh
+skilldispatch hooks install claude --dry-run
+skilldispatch hooks install claude
+skilldispatch hooks status claude
+skilldispatch doctor
+```
+
+Both mode defaults are `shadow`. `codex: advisory` is invalid. Project and explicit
+CLI configs cannot set execution modes, **even with trustProjectConfig enabled**.
+Changing YAML does not edit host settings. Status reports `hook_execution_mismatch`
+and an install command when configured advisory still has async registration (or
+shadow still has sync registration). Doctor reports `hook_mode_claude`,
+`hook_execution_claude` and boolean `advisory_ready`. Missing/mismatched registration
+is WARN, not a blocker to the host. These are local checks, not online auth or proof
+Claude reloaded its configuration.
+
+Claude advisory uses synchronous UserPromptSubmit JSON
+`hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: "..."}`.
+The [official hooks reference](https://code.claude.com/docs/en/hooks) distinguishes
+same-turn synchronous context from async output delivered on a later turn. The
+runtime checks its owned Claude registration is sync and enabled before returning
+advisory; unknown, async or conflicting registration stays silent. Reload the host
+when changing registration: an on-disk inspection cannot detect cached host state.
+Manual wrappers/custom host roots require review and are not advisory-ready here.
+
+Advisory trades extra prompt latency for same-turn recommendations. The existing
+2500 ms route timeout, zero SDK retries, 4-second process cutoff and 5-second host
+timeout are unchanged. Shadow remains async by default. To return to shadow, set
+`claude: shadow`, run `hooks install claude` again and reload the host.
+
+Only complete routing with safe selected skills can emit context. Zero selections,
+partial/failed/timeout/invalid responses emit nothing. Partial recommendations still
+appear in traces. Identifier omissions have safe diagnostics, and remaining safe
+recommendations keep the route policy order. If all are omitted, stdout is empty.
+All hook failures remain exit 0 without blocking decisions. A failed trace append
+does not prevent otherwise safe advisory output; failed key/config initialization
+can suppress both output and trace. `telemetry.enabled: false` still disables the
+entire hook runtime, including advisory.
+
+The context asks Claude to consider native Skill invocation **if available,
+permitted and applicable**, with the user's request taking priority. It never
+copies instructions or contains descriptions, bodies, paths, CWD, prompt text,
+probabilities or provider diagnostics. Only safe native identifiers are dynamic.
+Context is bounded to **4096 UTF-8 bytes**, keeping whole identifiers in policy
+order; omitted IDs are recorded without their content.
+
+For directly discovered local personal/project skills the native command is the
+**directory name**, not frontmatter display `name`. The
+[official skills reference](https://code.claude.com/docs/en/skills) describes native
+invocation and body loading. SkillDispatch uses adapter provenance, restricts names
+to letters/numbers/marks/underscore/ASCII hyphen (max 128 characters), and omits
+ambiguous invocation names across the entire discovered catalog. It does not
+reimplement host precedence. `disable-model-invocation` and disabled skills are
+checked again before delivery. Plugin, synced, bundled, legacy, additional-directory
+and nested lazy-loaded skills are not newly supported. Full `skillOverrides`,
+managed settings and native session availability are not modeled: Claude's native
+permission/invocation mechanism remains authoritative; this is a recommendation,
+not a bypass or a guarantee of invocation.
+
+**Recommended != injected != actually invoked.** Trace v1 keeps existing shadow
+records valid and adds `mode: advisory` plus optional
+`delivery: {kind: "none" | "claude-advisory", injectedSkillIds: [...]}`. Injected
+means included in emitted hook JSON, not proof of host receipt or tool use. A crash
+or stdout failure can still prevent delivery after a trace write. Summary separates
+mode counts/advisory recommended and injected counts; `traces show` labels injected
+recommendations separately. No advisory context text is persisted in traces.
 
 ### Manual alternative and Codex inline conflict
 
@@ -479,7 +559,8 @@ The default is false. Only the user layer can set this switch; project or explic
 CLI config cannot enable it. Without trust, project config is not even read or
 validated. With trust, the usual project layer can override user routing/telemetry
 settings, so enable this only for environments where those repositories are
-trusted. Hook commands have no explicit config override. Ordinary
+trusted. Execution modes remain user-owned even under this opt-in. Hook commands
+have no explicit config override. Ordinary
 `discover` / `route` / `eval` retain user → project → explicit CLI layering.
 
 ### Storage and privacy
@@ -552,18 +633,17 @@ setup failures produce failed traces when safe setup is available. Config,
 discovery or key failures may prevent any trace. Writer failures are swallowed.
 Events use one append each; storage is best effort, not a durable audit log.
 
-### Host visibility and advisory deferral
+### Host visibility and Codex advisory deferral
 
 Only supplied prompt text is evaluated. Codex currently omits structured
 attachments from this event, as reported in [upstream #41128](https://github.com/openai/codex/issues/41128).
 SkillDispatch does not inspect transcripts, images, session files or missing
 Claude content to compensate. Empty/whitespace-only text is a safe no-op.
 
-PR4 intentionally implements shadow mode only: measure first, inject later.
-Codex's context placement/salience concern is tracked in
-[upstream #40680](https://github.com/openai/codex/issues/40680). Advisory behavior
-will be evaluated separately for each host after shadow observations are
-available. Claude does not receive advisory injection ahead of Codex.
+Codex stays shadow-only. Its context placement/salience concern is tracked in
+[upstream #40680](https://github.com/openai/codex/issues/40680); PR7 adds no Codex
+workaround, context injection or subagent routing. Claude advisory is separately
+opt-in and does not claim native invocation or improved routing accuracy.
 
 ## Library and architecture
 
@@ -593,7 +673,7 @@ src/
   config/       YAML validation and layered loading
   eval/         YAML schema, selector resolution, metrics and sequential runner
   runtime/      Config/discovery/provider composition shared by CLI and hooks
-  hooks/        Bounded stdin, host wire adapters and silent shadow runtime
+  hooks/        Bounded stdin, shared mode-aware runtime and safe Claude advisory
   telemetry/    Trace v1 projection, HMAC, catalog fingerprint and JSONL sink
   cli/          discover/route/eval/hook commands
 tests/
@@ -663,15 +743,16 @@ Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
 HTTP in child processes. Format with `pnpm format`. See
 [PR5 validation](docs/PR5_VALIDATION.md) for trace operations,
-[PR6 validation](docs/PR6_VALIDATION.md) for registration management and installed-package checks,
+[PR6 validation](docs/PR6_VALIDATION.md) for registration management,
+[PR7 validation](docs/PR7_VALIDATION.md) for Claude advisory safety and installed-package checks,
 [PR4 validation](docs/PR4_VALIDATION.md) for hooks and trace privacy,
 [PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
-Advisory/enforce modes, invocation detection, Studio and cloud trace services remain later work.
+Codex advisory, enforce mode, invocation detection, Studio and cloud trace services remain later work.
 
 ## Local trace inspection
 
-`traces summary`, `traces list`, and `traces show <trace-id>` read the shadow
+`traces summary`, `traces list`, and `traces show <trace-id>` read the
 hook trace destination, with `--json` available on each. They use the hook config
 trust policy: user settings only, unless the user opts into project config. They
 never write events or display raw prompts, prompt hashes, session keys or prompt
@@ -709,7 +790,7 @@ Malformed settings, invalid credentials, unsafe storage or unwritable trace
 destinations are FAIL. Missing credentials still prevent useful Jev routing even
 though offline installation checks can complete successfully. The separate
 `routing_ready` check is true only when local provider prerequisites pass (mock,
-or a valid-shaped Jev key) and shadow telemetry is enabled. It is false/WARN for
+or a valid-shaped Jev key) and hook telemetry is enabled. It is false/WARN for
 missing/invalid keys, disabled telemetry, or unreadable routing config. It does
 not prove online authentication, host registration/trust or trace delivery.
 `hooks status` returns exit 1 for conflicts; an absent registration alone is exit 0.

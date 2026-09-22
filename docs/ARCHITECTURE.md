@@ -1,10 +1,12 @@
 # Architecture
 
-## Implemented PR6 boundary
+## Implemented PR7 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
 library and CLI entry points. Discovery, Jev/mock routing, routing evaluation,
-shadow hooks, local traces, offline doctor, trace analytics and user hook registration are active. Advisory/enforce behavior is deferred.
+shadow hooks, local traces, offline doctor, trace analytics and user hook registration
+are active. Claude advisory is user opt-in; Codex stays shadow-only. Enforce and
+subagent routing are not implemented.
 
 ```text
 cli/program + commands
@@ -18,6 +20,7 @@ cli/program + commands
   -> eval/schema -> eval/resolve -> eval/runner -> core/route
        -> eval/metrics (pure scoring and aggregation)
   -> hooks/codex | hooks/claude -> hooks/runtime -> runtime/context + core/route
+       -> hooks/advisory + discovery/claude-invocation (Claude only)
        -> telemetry/trace -> privacy + fingerprint -> JsonlTraceSink
   -> ops/context -> trusted config + telemetry storage paths
        -> telemetry/reader -> analytics + views -> traces CLI
@@ -320,7 +323,8 @@ explicit config. Hook runtime requests `mode: "hook"`: defaults → user only,
 unless the **user layer** sets `hook.trustProjectConfig: true` (default false).
 Untrusted project config is skipped before stat/read/parse, including malformed
 files and self-authorizing trust flags. Hook mode accepts no explicit layer;
-project/explicit layers can never change the user trust switch in any mode.
+project/explicit layers can never change the user trust switch or execution modes
+in any mode. Registration reads `mode: "user"`, skipping all project settings.
 Core domain types do not know config provenance.
 
 This isolates global hooks from repository-controlled trace paths, raw prompt
@@ -344,16 +348,13 @@ Only `skilldispatch hook codex|claude` gets a 4-second process deadline, coverin
 stdin, discovery, routing and storage. On return it exits 0 even if timed-out SDK
 work still has sockets alive. The library has no process lifecycle side effects.
 The underlying route default remains 2500 ms. Recommend host command timeout 5
-seconds for startup/headroom; command hooks block while running, so shadow mode
-has a latency cost despite leaving context and decisions untouched.
+seconds for startup/headroom. Default shadow registration is asynchronous; explicit
+Claude advisory runs synchronously and adds routing latency to the current prompt.
 
-The result is always empty stdout, silent stderr and exit 0; no response JSON,
-additionalContext, decision, reason or systemMessage is generated. Empty success
-is neutral for both current hosts. Help/invalid CLI usage retain ordinary CLI
-semantics; fail-open applies to supported hook invocations. This is deliberately
-**shadow only**. Advisory injection will be evaluated separately per host after
-shadow data is available, including Codex's reported context-placement concern.
-See [PR4 validation](PR4_VALIDATION.md) for official input/output/config sources.
+Shadow output is empty; only Claude advisory can return the official UserPromptSubmit
+JSON response. Neither mode emits blocking decisions/reasons/system messages. Invalid
+CLI usage retains ordinary command semantics. See [PR4 validation](PR4_VALIDATION.md)
+for shadow input/privacy and [PR7 validation](PR7_VALIDATION.md) for advisory behavior.
 
 ## Route Trace v1 and TraceSink
 
@@ -373,7 +374,7 @@ Old development traces with turnKey are rejected by the revised strict schema.
 Readers should dispatch by schemaVersion; incompatible changes after release
 require an explicit new contract version.
 
-The allowlist projection includes trace UUID/time, agent/shadow mode, prompt
+The allowlist projection includes trace UUID/time, agent/mode, prompt
 storage discriminator, pseudonymous host keys/model, catalog fingerprint/counts,
 provider/model/route latency, threshold/maxSkills, outcome, scored decisions and
 diagnostic code/level/known skill IDs. Decisions contain local skill ID, name,
@@ -594,9 +595,11 @@ A failed replacement leaves the original intact (a backup can already exist).
 No stale lock is stolen. This guards cooperating installers and detected external
 edits, not arbitrary malicious same-user races at the final rename boundary.
 
-Install defaults to `async: true`, `timeout: 5` seconds. `--sync` changes async to
-false, with no context output or routing change. The existing hook runtime retains
-its own 4-second cutoff, 1-second bounded stdin, and 2500 ms routing deadline.
+Shadow install defaults to `async: true`, `timeout: 5` seconds. Claude advisory is
+sync. Claude shadow supports `--sync` debugging; Codex `--sync` is rejected in PR7.
+Install reconciles only owned execution/timeout fields; mode changes alone do not
+mutate host settings. The hook retains its 4-second cutoff, 1-second bounded stdin,
+and 2500 ms routing deadline. Stdout is flushed before terminating pending SDK sockets.
 Claude does not enforce `timeout` on already-running ordinary async hooks. Async
 session lifecycle is host-owned: cancellation/teardown may omit traces; absence is
 not a no-skill decision. Codex trust review remains necessary after registration.
@@ -614,3 +617,53 @@ project config to select a destination.
 See [PR6 validation](PR6_VALIDATION.md) for official host references and runtime
 verification. This phase adds no advisory/context injection, project registration,
 host settings migration, invocation tracking, delivery queue or cloud functionality.
+
+## Claude advisory boundary (PR7)
+
+`hook.modes` defaults to `{claude: shadow, codex: shadow}`; only the user config can
+change Claude to advisory. Even explicitly trusted projects cannot change either
+mode. Unknown modes and Codex advisory reject configuration, without silent coercion.
+Core routing and provider contracts are unchanged and have no host-specific types.
+
+`hooks/runtime.ts` reuses single-agent discovery, provider creation and `route()`.
+Only complete results with selections can reach `hooks/advisory.ts`. The CLI supplies
+a read-only registration readiness check: exact owned Claude command, one sync
+registration, configured advisory, no conflict/disable issue. Async/unknown state
+gets `advisory_registration_not_ready` and no output. Current file state is not proof
+that a running host reloaded settings; host lifecycle remains external.
+
+`discovery/claude-invocation.ts` derives identifiers from direct personal/project
+source entries, including the local symlink entry, rather than canonical target or
+frontmatter display names. Source-root/nested/plugin entries without this provenance
+are omitted. Only a bounded letters/numbers/marks/underscore/ASCII-hyphen identifier
+is accepted. Counts include disabled catalog entries; multiple matches cause
+`advisory_ambiguous_skill_invocation`. No approximate native precedence is applied.
+Disabled/manual-only/invalid policy is independently checked in the builder. Current
+managed/runtime `skillOverrides` and availability are not fully discovered: native
+host permissions remain authoritative, and unsupported sources are not inferred.
+
+The pure builder projects only identifiers, retaining selection order. Static text
+prioritizes the user's request, asks to consider native Skill invocation if permitted
+and applicable, and says to continue normally if unavailable. No prompt, probability,
+description, body, path, diagnostic or arbitrary metadata is included. A 4096-byte
+UTF-8 context budget omits a deterministic suffix without truncating identifiers.
+Omissions have code/skill-ID diagnostics. JSON is serialized, never concatenated.
+Serialization/resolution failures are silent and get a safe trace diagnostic where
+possible. Partial or failed routing never produces advisory output.
+
+Trace v1 additively extends mode to shadow/advisory and allows optional delivery
+kind/injectedSkillIds. Old shadow traces without delivery remain valid against both
+Zod and JSON Schema. Selected denotes routing policy; injected denotes emitted hook
+JSON, not host acknowledgement. The trace is appended before output; a later stdout
+failure/crash can prevent receipt. Writer failure is swallowed while safe output can
+still be returned. Initialization failures may produce neither. No native invocation
+or compliance tracking is implied. Analytics retains selection statistics and adds
+mode/advisory counts and a safe injected flag, without exposing context text or raw
+prompt/correlation data. Trace-only APIs do not route or mutate events.
+
+Registration mode ownership is shared via `registration/mode.ts`; installer and
+inspector use the same user config parser. Mismatches remain installed with a safe
+issue and reinstall guidance, and doctor WARNs. `advisory_ready` requires configured
+advisory, sync registration without issues and `routing_ready`; shadow reports false
+without implying an installation failure. Status/doctor never reconcile automatically.
+Atomic mutation, private backup, exact ownership and offline behavior remain intact.
