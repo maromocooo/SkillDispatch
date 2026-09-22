@@ -14,7 +14,7 @@ const settings = (): ClaudeCatalogSettings => ({
   enabledPlugins: new Map(),
   skillOverrides: new Map(),
   syncClaudeAiSkills: true,
-  strictPluginOnlyCustomization: false,
+  strictPluginOnlySkills: false,
 });
 async function fixture() {
   const ctx = await workspace();

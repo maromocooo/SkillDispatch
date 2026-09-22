@@ -244,6 +244,11 @@ skills remain discoverable but cannot become routing/advisory candidates. Explic
 `skillOverrides` restrictions apply to non-plugin skills; plugin enablement is
 controlled by `enabledPlugins` instead. File-based managed settings and enterprise
 skill roots are supported read-only; MDM/server/session overrides are not inferred.
+`strictPluginOnlyCustomization` is read only from managed settings: true locks
+skills, while an array locks skills only when it contains `"skills"`. Unknown
+surface names and non-managed copies of this policy are ignored. With skills locked,
+plugin/managed skills remain eligible; local skills remain visible but non-routable,
+and synced skills are not loaded. Manual-only restrictions still apply.
 
 Inspect the expanded catalog offline:
 

@@ -120,7 +120,7 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
     const synced =
       settings.valid &&
       settings.syncClaudeAiSkills &&
-      !settings.strictPluginOnlyCustomization
+      !settings.strictPluginOnlySkills
         ? await discoverSyncedSkills(configHome)
         : { skills: [], diagnostics: [] };
     result.skills.push(...synced.skills);
@@ -139,7 +139,9 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       // Never trust frontmatter to claim adapter-owned origin/invocation metadata.
       if (
         !settings.valid ||
-        (settings.strictPluginOnlyCustomization && origin?.origin !== "plugin")
+        (settings.strictPluginOnlySkills &&
+          origin?.origin !== "plugin" &&
+          origin?.origin !== "managed")
       ) {
         skill.enabled = false;
         skill.metadata.disabledReason = "claude_settings_restricted";

@@ -17,7 +17,7 @@ export interface ClaudeCatalogSettings {
   enabledPlugins: Map<string, boolean>;
   skillOverrides: Map<string, string>;
   syncClaudeAiSkills: boolean;
-  strictPluginOnlyCustomization: boolean;
+  strictPluginOnlySkills: boolean;
 }
 export function managedClaudeDirectory(platform = process.platform): string {
   return platform === "darwin"
@@ -25,6 +25,24 @@ export function managedClaudeDirectory(platform = process.platform): string {
     : platform === "win32"
       ? "C:\\Program Files\\ClaudeCode"
       : "/etc/claude-code";
+}
+
+/** Managed file fragments merge arrays, while scalar values replace previous values.
+ * Unknown string surfaces are forward-compatible; non-string entries are malformed.
+ */
+function mergeManagedCustomization(
+  previous: boolean | string[] | undefined,
+  value: unknown,
+): boolean | string[] {
+  if (typeof value === "boolean") return value;
+  if (
+    !Array.isArray(value) ||
+    value.some((surface) => typeof surface !== "string")
+  )
+    throw new Error();
+  return Array.isArray(previous)
+    ? [...new Set([...previous, ...value])]
+    : value;
 }
 
 /** Catalog settings, not SkillDispatch runtime config. Never reads env/credentials. */
@@ -40,8 +58,9 @@ export async function loadClaudeCatalogSettings(
     enabledPlugins: new Map(),
     skillOverrides: new Map(),
     syncClaudeAiSkills: true,
-    strictPluginOnlyCustomization: false,
+    strictPluginOnlySkills: false,
   };
+  let managedCustomization: boolean | string[] | undefined;
   const locations: ClaudeSettingsLocation[] = [
     { source: "user", path: join(configRoot, "settings.json") },
     { source: "project", path: join(context.cwd, ".claude/settings.json") },
@@ -136,11 +155,20 @@ export async function loadClaudeCatalogSettings(
         if (data.syncClaudeAiSkills === false)
           settings.syncClaudeAiSkills = false;
       }
-      if (data.strictPluginOnlyCustomization !== undefined) {
-        if (typeof data.strictPluginOnlyCustomization !== "boolean")
-          throw new Error();
-        settings.strictPluginOnlyCustomization =
-          data.strictPluginOnlyCustomization;
+      // Only managed documents own this policy. Out-of-scope values are ignored,
+      // including values that would be malformed in an authoritative source.
+      if (
+        source === "managed" &&
+        data.strictPluginOnlyCustomization !== undefined
+      ) {
+        managedCustomization = mergeManagedCustomization(
+          managedCustomization,
+          data.strictPluginOnlyCustomization,
+        );
+        settings.strictPluginOnlySkills =
+          managedCustomization === true ||
+          (Array.isArray(managedCustomization) &&
+            managedCustomization.includes("skills"));
       }
     } catch {
       settings.valid = false;
