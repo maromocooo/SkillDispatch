@@ -7,13 +7,14 @@ import { createProgram } from "./program.js";
 
 // Bound the dedicated hook process, including stdin, discovery and filesystem I/O.
 // Do not install process lifecycle behavior for library users or other commands.
-const shadowInvocation =
+const hookInvocation =
   process.argv[2] === "hook" &&
   ["codex", "claude"].includes(process.argv[3] ?? "") &&
   process.argv.length === 4;
-const hookDeadline = shadowInvocation
+const hookDeadline = hookInvocation
   ? setTimeout(() => process.exit(0), 4000)
   : undefined;
+if (hookInvocation) process.stdout.on("error", () => process.exit(0));
 try {
   const program = createProgram(
     {
@@ -39,7 +40,7 @@ try {
   );
   await program.parseAsync(process.argv);
 } catch (error) {
-  if (!shadowInvocation) {
+  if (!hookInvocation) {
     if (error instanceof CommanderError) process.exitCode = error.exitCode;
     else {
       process.stderr.write(
@@ -52,5 +53,11 @@ try {
   if (hookDeadline !== undefined) clearTimeout(hookDeadline);
   // Storage has been awaited. Do not let a timed-out provider's remaining sockets
   // hold up the host; no AbortSignal is forwarded into the SDK's unsafe transport.
-  if (shadowInvocation) process.exit(0);
+  if (hookInvocation) {
+    // Flush the bounded advisory JSON before forcing pending provider sockets closed.
+    await new Promise<void>((resolve) =>
+      process.stdout.write("", () => resolve()),
+    );
+    process.exit(0);
+  }
 }

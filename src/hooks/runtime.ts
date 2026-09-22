@@ -14,8 +14,9 @@ import {
   installationKey,
   tracePath,
 } from "../telemetry/storage.js";
-import { createRouteTrace } from "../telemetry/trace.js";
+import { createRouteTrace, routingOutcome } from "../telemetry/trace.js";
 import type { TraceSink } from "../telemetry/types.js";
+import { buildClaudeAdvisory } from "./advisory.js";
 import type { HookInput } from "./types.js";
 
 interface HookServices {
@@ -23,14 +24,16 @@ interface HookServices {
   createProvider: typeof createProvider;
   getKey: typeof installationKey;
   makeSink: (path: string) => TraceSink;
+  canAdvise: () => Promise<boolean>;
+  buildAdvisory: typeof buildClaudeAdvisory;
 }
 
-/** Shadow only: no output, host instructions, invocation or propagated exception. */
-export async function runShadowHook(
+/** Shared fail-open runtime. Only explicit, safely registered Claude advisory may return JSON. */
+export async function runHook(
   input: HookInput,
   environment: RuntimeEnvironment,
   overrides: Partial<HookServices> = {},
-): Promise<void> {
+): Promise<string | undefined> {
   try {
     if (!input.prompt.trim()) return; // No text available, including attachment-only turns.
     const services: HookServices = {
@@ -38,6 +41,8 @@ export async function runShadowHook(
       createProvider,
       getKey: installationKey,
       makeSink: (path) => new JsonlTraceSink(path),
+      canAdvise: async () => false,
+      buildAdvisory: buildClaudeAdvisory,
       ...overrides,
     };
     const context = await services.loadContext(
@@ -46,6 +51,8 @@ export async function runShadowHook(
     );
     const { config, catalog, cwd } = context;
     if (!config.telemetry.enabled) return;
+    const mode =
+      input.agent === "claude-code" ? config.hook.modes.claude : "shadow";
     const path = tracePath(environment, config.telemetry.tracePath);
     const directory = dataDirectory(environment);
     // A configured trace destination must never append JSON into the installation key.
@@ -61,7 +68,7 @@ export async function runShadowHook(
       router: { provider: config.router.provider, latencyMs: 0 },
       policy: { ...config.policy },
       diagnostics: [
-        { code, level: "warning", message: "Shadow routing unavailable." },
+        { code, level: "warning", message: "Hook routing unavailable." },
       ],
     });
     let result = failed("provider_setup_failed");
@@ -88,8 +95,47 @@ export async function runShadowHook(
         result = failed("hook_runtime_failed");
       }
     }
+    let advisory: ReturnType<typeof buildClaudeAdvisory> = {
+      output: undefined,
+      injectedSkillIds: [],
+      diagnostics: [],
+    };
+    if (
+      mode === "advisory" &&
+      routingOutcome(result) === "complete" &&
+      result.selected.length
+    ) {
+      try {
+        if (await services.canAdvise())
+          advisory = services.buildAdvisory(result.selected, catalog.skills);
+        else
+          advisory.diagnostics.push({
+            code: "advisory_registration_not_ready",
+            level: "warning",
+            message:
+              "Synchronous Claude registration must be reconciled before advisory delivery.",
+          });
+      } catch {
+        advisory = {
+          output: undefined,
+          injectedSkillIds: [],
+          diagnostics: [
+            {
+              code: "advisory_output_failed",
+              level: "warning",
+              message: "Advisory output unavailable.",
+            },
+          ],
+        };
+      }
+    }
     const trace = createRouteTrace({
       agent: input.agent,
+      mode,
+      delivery: {
+        kind: advisory.output ? "claude-advisory" : "none",
+        injectedSkillIds: advisory.injectedSkillIds,
+      },
       prompt: input.prompt,
       sessionId: input.sessionId,
       ...(input.promptCorrelationId === undefined
@@ -98,11 +144,16 @@ export async function runShadowHook(
       ...(input.model === undefined ? {} : { hostModel: input.model }),
       skills: catalog.skills,
       result,
-      diagnostics: catalog.diagnostics,
+      diagnostics: [...catalog.diagnostics, ...advisory.diagnostics],
       promptStorage: config.telemetry.prompt,
       key,
     });
-    await sink.write(trace);
+    try {
+      await sink.write(trace);
+    } catch {
+      /* Storage is best effort; an otherwise safe advisory remains usable. */
+    }
+    return advisory.output;
   } catch {
     /* Parsing/config/discovery/keys/telemetry must all fail open silently. */
   }

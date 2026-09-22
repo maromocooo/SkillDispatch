@@ -78,26 +78,26 @@ export function createProgram(
   const hook = program
     .command("hook")
     .description(
-      "Run a silent shadow UserPromptSubmit hook from bounded stdin; never inject context",
+      "Run a fail-open UserPromptSubmit hook (shadow by default; Claude advisory opt-in)",
     );
   for (const host of ["codex", "claude"] as const)
     hook
       .command(host)
       .description(
-        `Shadow route ${host} skills and append a private local trace`,
+        host === "codex"
+          ? "Shadow route Codex skills; stdout is always empty"
+          : "Route Claude skills; user-owned mode controls advisory output",
       )
-      .action(() => hookCommand(host, environment, stdin));
+      .action(() => hookCommand(host, environment, stdin, io));
   program
     .command("doctor")
-    .description(
-      "Check local shadow routing readiness offline; no files changed",
-    )
+    .description("Check local routing readiness offline; no files changed")
     .option("--json", "write privacy-safe JSON")
     .action((options) => doctorCommand(options, environment, io));
   const registrations = program
     .command("hooks")
     .description(
-      "Inspect/install/remove user-scope shadow hook registrations offline",
+      "Inspect/install/remove user-scope hook registrations offline",
     );
   registrations
     .command("status")
@@ -115,7 +115,7 @@ export function createProgram(
     if (action === "install")
       command.option(
         "--sync",
-        "wait synchronously in the host (default: async shadow)",
+        "Claude shadow debug only: wait synchronously (advisory is always sync)",
       );
     command.action((host, options) =>
       hooksMutation(host, action, options, environment, io),
@@ -123,9 +123,7 @@ export function createProgram(
   }
   const traces = program
     .command("traces")
-    .description(
-      "Inspect local shadow recommendations without exposing prompts",
-    );
+    .description("Inspect local recommendations without exposing prompts");
   for (const name of ["summary", "list"] as const) {
     const command = traces
       .command(name)

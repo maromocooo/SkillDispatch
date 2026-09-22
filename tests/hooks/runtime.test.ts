@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClaudeInput } from "../../src/hooks/claude.js";
 import { parseCodexInput } from "../../src/hooks/codex.js";
-import { runShadowHook } from "../../src/hooks/runtime.js";
+import { runHook } from "../../src/hooks/runtime.js";
 import type { RouterProvider } from "../../src/providers/types.js";
 import type { RouteTrace } from "../../src/telemetry/types.js";
 import { workspace, write } from "../helpers.js";
@@ -81,7 +81,7 @@ describe("shared silent shadow runtime", () => {
         }),
       };
       await expect(
-        runShadowHook(f.input, f.environment, {
+        runHook(f.input, f.environment, {
           createProvider: () => provider,
         }),
       ).resolves.toBeUndefined();
@@ -136,7 +136,7 @@ describe("shared silent shadow runtime", () => {
     "retains successful partial decisions (all failed=%s)",
     async (allFailed) => {
       const f = await setup();
-      await runShadowHook(f.input, f.environment, {
+      await runHook(f.input, f.environment, {
         createProvider: () => ({
           name: "fixture",
           judge: async ({ candidates }) => ({
@@ -180,7 +180,7 @@ describe("shared silent shadow runtime", () => {
     "persists %s as failed",
     async (code) => {
       const f = await setup();
-      await runShadowHook(f.input, f.environment, {
+      await runHook(f.input, f.environment, {
         createProvider: () => ({
           name: "fixture",
           judge: async () => {
@@ -209,7 +209,7 @@ describe("shared silent shadow runtime", () => {
     "traces missing credentials without a network request (%s)",
     async (host) => {
       const f = await setup(host, "router:\n  provider: jev\n");
-      await runShadowHook(f.input, f.environment);
+      await runHook(f.input, f.environment);
       expect((await f.traces())[0]).toMatchObject({
         outcome: "failed",
         router: { provider: "jev" },
@@ -228,7 +228,7 @@ describe("shared silent shadow runtime", () => {
         "codex",
         `router:\n  provider: mock\ntelemetry:\n  prompt: ${mode}\n`,
       );
-      await runShadowHook(f.input, f.environment);
+      await runHook(f.input, f.environment);
       expect((await f.traces())[0]?.prompt).toEqual(
         mode === "none"
           ? { storage: "none" }
@@ -239,8 +239,8 @@ describe("shared silent shadow runtime", () => {
 
   it("correlates events with the same installation key, but gives each a fresh trace ID", async () => {
     const f = await setup();
-    await runShadowHook(f.input, f.environment);
-    await runShadowHook(f.input, f.environment);
+    await runHook(f.input, f.environment);
+    await runHook(f.input, f.environment);
     const [a, b] = await f.traces();
     expect(a?.prompt).toEqual(b?.prompt);
     expect(a?.host).toEqual(b?.host);
@@ -260,7 +260,7 @@ describe("shared silent shadow runtime", () => {
     const fail = () => {
       throw new Error("PRIVATE_FAILURE");
     };
-    const overrides: Parameters<typeof runShadowHook>[2] = {};
+    const overrides: Parameters<typeof runHook>[2] = {};
     if (failure === "invalid_config")
       await write(
         join(f.ctx.home, ".config/skilldispatch/config.yaml"),
@@ -277,7 +277,7 @@ describe("shared silent shadow runtime", () => {
         "telemetry: {enabled: false}",
       );
     await expect(
-      runShadowHook(f.input, f.environment, overrides),
+      runHook(f.input, f.environment, overrides),
     ).resolves.toBeUndefined();
     await expect(f.traces()).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
@@ -291,7 +291,7 @@ describe("shared silent shadow runtime", () => {
       { agent: f.input.agent },
     );
     const judge = vi.fn();
-    await runShadowHook(f.input, f.environment, {
+    await runHook(f.input, f.environment, {
       loadContext: async () => ({
         ...context,
         catalog: { skills: [], diagnostics: [] },
@@ -317,7 +317,7 @@ it("does not corrupt the reserved installation key when tracePath points to it",
     join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `telemetry:\n  tracePath: ${keyPath}\n`,
   );
-  await runShadowHook(f.input, f.environment);
+  await runHook(f.input, f.environment);
   expect(await readFile(keyPath)).toEqual(key);
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -329,14 +329,14 @@ it("uses the configured trace path and survives a real trace-file failure", asyn
     join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${path}\n`,
   );
-  await runShadowHook(f.input, f.environment);
+  await runHook(f.input, f.environment);
   expect(JSON.parse(await readFile(path, "utf8")).outcome).toBe("complete");
   await expect(f.traces()).rejects.toThrow();
   await write(
     join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${f.ctx.root}\n`,
   );
-  await expect(runShadowHook(f.input, f.environment)).resolves.toBeUndefined();
+  await expect(runHook(f.input, f.environment)).resolves.toBeUndefined();
 });
 
 it("records unexpected route exceptions after safe setup", async () => {
@@ -348,7 +348,7 @@ it("records unexpected route exceptions after safe setup", async () => {
   );
   // Duplicate IDs trigger a core input exception, not an SDK diagnostic.
   context.catalog.skills.push(...context.catalog.skills);
-  await runShadowHook(f.input, f.environment, {
+  await runHook(f.input, f.environment, {
     loadContext: async () => context,
   });
   expect((await f.traces())[0]).toMatchObject({
@@ -361,7 +361,7 @@ it("records unexpected route exceptions after safe setup", async () => {
 
 it("protects the key even when data and trace paths use different parent aliases", async () => {
   const f = await setup();
-  await runShadowHook(f.input, f.environment);
+  await runHook(f.input, f.environment);
   const keyPath = join(f.data, "install.key");
   const original = await readFile(keyPath);
   const alias = join(f.ctx.root, "alias");
@@ -371,7 +371,7 @@ it("protects the key even when data and trace paths use different parent aliases
     join(f.ctx.home, ".config/skilldispatch/config.yaml"),
     `router: {provider: mock}\ntelemetry:\n  tracePath: ${keyPath}\n`,
   );
-  await runShadowHook(f.input, f.environment);
+  await runHook(f.input, f.environment);
   expect(await readFile(keyPath)).toEqual(original);
   expect((await f.traces()).length).toBe(1);
 });
