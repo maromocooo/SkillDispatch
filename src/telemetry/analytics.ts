@@ -110,6 +110,8 @@ export async function summarizeTraces(
 ) {
   const counts = emptyCounts();
   const agents = { codex: 0, "claude-code": 0 };
+  const modes = { shadow: 0, advisory: 0 };
+  const advisory = { recommendedCount: 0, injectedCount: 0 };
   const outcomes = { complete: 0, partial: 0, failed: 0 };
   const providers = new Map<string, number>();
   const fingerprints = new Set<string>();
@@ -118,6 +120,13 @@ export async function summarizeTraces(
   let totalSelected = 0;
   for await (const trace of matching(reader, counts, filter)) {
     agents[trace.agent]++;
+    modes[trace.mode]++;
+    if (trace.mode === "advisory") {
+      advisory.recommendedCount += trace.decisions.filter(
+        (d) => d.selected,
+      ).length;
+      advisory.injectedCount += trace.delivery?.injectedSkillIds.length ?? 0;
+    }
     outcomes[trace.outcome]++;
     providers.set(
       trace.router.provider,
@@ -164,6 +173,8 @@ export async function summarizeTraces(
     ...counts,
     agents,
     outcomes,
+    modes,
+    advisory,
     providers: [...providers]
       .sort(([a], [b]) => compareText(a, b))
       .map(([provider, count]) => ({ provider, count })),

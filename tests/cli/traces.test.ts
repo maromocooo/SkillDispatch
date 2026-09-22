@@ -121,6 +121,8 @@ describe("operational trace CLI", () => {
       "timestamp",
       "agent",
       "outcome",
+      "mode",
+      "injectedCount",
       "provider",
       "model",
       "selectedCount",

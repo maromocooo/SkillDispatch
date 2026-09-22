@@ -18,6 +18,8 @@ import {
 
 export interface TraceInput {
   agent: RouteTrace["agent"];
+  mode?: RouteTrace["mode"];
+  delivery?: RouteTrace["delivery"];
   prompt: string;
   sessionId: string;
   promptCorrelationId?: string;
@@ -52,14 +54,6 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
           }),
     }))
     .sort((a, b) => compareText(JSON.stringify(a), JSON.stringify(b)));
-  const codes = new Set(diagnostics.map((item) => item.code));
-  const failed = [
-    "provider_failed",
-    "provider_timeout",
-    "invalid_provider_response",
-    "provider_setup_failed",
-    "hook_runtime_failed",
-  ].some((code) => codes.has(code));
   const hostModel = safeModelSchema.safeParse(input.hostModel);
   const routerModel = safeModelSchema.safeParse(result.router.model);
   return routeTraceSchema.parse({
@@ -67,7 +61,8 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
     traceId: randomUUID(),
     timestamp: new Date().toISOString(),
     agent,
-    mode: "shadow",
+    mode: input.mode ?? "shadow",
+    ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
     prompt: privatePrompt(input.prompt, input.promptStorage ?? "hash", key),
     host: {
       event: "UserPromptSubmit",
@@ -97,11 +92,7 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
       threshold: result.policy.threshold,
       maxSkills: result.policy.maxSkills,
     },
-    outcome: failed
-      ? "failed"
-      : codes.has("provider_partial")
-        ? "partial"
-        : "complete",
+    outcome: routingOutcome(result),
     decisions: result.allDecisions.map((decision) => {
       const skill = byId.get(decision.skillId);
       if (!skill) throw new Error("Invalid trace catalog.");
@@ -117,4 +108,20 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
     }),
     diagnostics,
   });
+}
+
+/** Outcome is based on routing, independently of recommendation delivery. */
+export function routingOutcome(result: RouteResult): RouteTrace["outcome"] {
+  const codes = new Set(result.diagnostics.map((d) => d.code));
+  if (
+    [
+      "provider_failed",
+      "provider_timeout",
+      "invalid_provider_response",
+      "provider_setup_failed",
+      "hook_runtime_failed",
+    ].some((code) => codes.has(code))
+  )
+    return "failed";
+  return codes.has("provider_partial") ? "partial" : "complete";
 }

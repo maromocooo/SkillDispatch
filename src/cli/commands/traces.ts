@@ -56,7 +56,9 @@ export async function tracesCommand(
     );
     if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
     else {
-      io.stdout("Trace ID\tTimestamp\tAgent\tOutcome\tSelected\tLatency ms\n");
+      io.stdout(
+        "Trace ID\tTimestamp\tAgent\tOutcome\tMode\tSelected\tLatency ms\n",
+      );
       for (const trace of result.traces) printListItem(trace, io);
       io.stdout(
         `Showing ${result.traces.length} of ${result.matchedTraces} matching traces; invalid lines: ${result.invalidLines}\n`,
@@ -78,6 +80,9 @@ function printSummary(s: TraceSummary, io: CliIO) {
     `Agents: Codex ${s.agents.codex}; Claude Code ${s.agents["claude-code"]}\nOutcomes: Complete ${s.outcomes.complete}; Partial ${s.outcomes.partial}; Failed ${s.outcomes.failed}\n`,
   );
   io.stdout(
+    `Modes: shadow ${s.modes.shadow}; advisory ${s.modes.advisory}\nAdvisory recommendations: ${s.advisory.recommendedCount}; injected: ${s.advisory.injectedCount}\n`,
+  );
+  io.stdout(
     `Average selected skills: ${number(s.averageSelectedSkills)}\nP50 latency ms: ${number(s.p50LatencyMs)}\nP95 latency ms: ${number(s.p95LatencyMs)}\nProviders:\n`,
   );
   for (const p of s.providers)
@@ -95,12 +100,12 @@ function printSummary(s: TraceSummary, io: CliIO) {
 }
 function printListItem(t: TraceListView, io: CliIO) {
   io.stdout(
-    `${t.traceId}\t${t.timestamp}\t${t.agent}\t${t.outcome}\t${t.selectedCount}\t${number(t.latencyMs)}\n`,
+    `${t.traceId}\t${t.timestamp}\t${t.agent}\t${t.outcome}\t${t.mode}\t${t.selectedCount}\t${number(t.latencyMs)}\n`,
   );
 }
 function printDetail(t: TraceDetailView, io: CliIO) {
   io.stdout(
-    `Trace: ${t.traceId}\nTimestamp: ${t.timestamp}\nAgent: ${t.agent}\nOutcome: ${t.outcome}\nProvider: ${terminalText(t.provider)}\n`,
+    `Trace: ${t.traceId}\nTimestamp: ${t.timestamp}\nAgent: ${t.agent}\nOutcome: ${t.outcome}\nMode: ${t.mode}\nProvider: ${terminalText(t.provider)}\n`,
   );
   if (t.model) io.stdout(`Model: ${terminalText(t.model)}\n`);
   io.stdout(
@@ -114,6 +119,11 @@ function printDetail(t: TraceDetailView, io: CliIO) {
       io.stdout(
         `  ${terminalText(d.name)}\t${d.agent}\t${d.scope}\t${d.probability.toFixed(4)}\n`,
       );
+  }
+  if (t.mode === "advisory") {
+    io.stdout("Injected recommendations (not observed invocations):\n");
+    for (const d of t.decisions.filter((d) => d.injected))
+      io.stdout(`  ${terminalText(d.name)}\t${d.agent}\t${d.scope}\n`);
   }
   io.stdout("Diagnostics:\n");
   for (const d of t.diagnostics) io.stdout(`  ${d.code}\t${d.level}\n`);

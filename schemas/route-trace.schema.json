@@ -22,7 +22,26 @@
     },
     "mode": {
       "type": "string",
-      "const": "shadow"
+      "enum": ["shadow", "advisory"]
+    },
+    "delivery": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["none", "claude-advisory"]
+        },
+        "injectedSkillIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "required": ["kind", "injectedSkillIds"],
+      "additionalProperties": false,
+      "description": "Recommendations emitted in host context output; not proof of host consumption or native invocation."
     },
     "prompt": {
       "oneOf": [
@@ -245,5 +264,5 @@
   "additionalProperties": false,
   "$id": "https://skilldispatch.dev/schemas/route-trace-v1.json",
   "title": "SkillDispatch Route Trace v1",
-  "description": "Local shadow routing recommendations. No host invocation or output quality is inferred."
+  "description": "Local routing recommendations and optional advisory delivery. No host invocation or output quality is inferred."
 }

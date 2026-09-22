@@ -14,7 +14,16 @@ export const routeTraceSchema = z
     traceId: z.uuid(),
     timestamp: z.iso.datetime(),
     agent: z.enum(["codex", "claude-code"]),
-    mode: z.literal("shadow"),
+    mode: z.enum(["shadow", "advisory"]),
+    delivery: z
+      .strictObject({
+        kind: z.enum(["none", "claude-advisory"]),
+        injectedSkillIds: z.array(digestSchema),
+      })
+      .describe(
+        "Recommendations emitted in host context output; not proof of host consumption or native invocation.",
+      )
+      .optional(),
     prompt: z.discriminatedUnion("storage", [
       z.strictObject({ storage: z.literal("none") }),
       z.strictObject({
@@ -77,7 +86,7 @@ export const routeTraceSchema = z
     $id: "https://skilldispatch.dev/schemas/route-trace-v1.json",
     title: "SkillDispatch Route Trace v1",
     description:
-      "Local shadow routing recommendations. No host invocation or output quality is inferred.",
+      "Local routing recommendations and optional advisory delivery. No host invocation or output quality is inferred.",
   });
 
 export type RouteTrace = z.infer<typeof routeTraceSchema>;

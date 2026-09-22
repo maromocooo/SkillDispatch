@@ -7,6 +7,8 @@ export function traceListView(trace: RouteTrace) {
     timestamp: trace.timestamp,
     agent: trace.agent,
     outcome: trace.outcome,
+    mode: trace.mode,
+    injectedCount: trace.delivery?.injectedSkillIds.length ?? 0,
     provider: trace.router.provider,
     ...(trace.router.model === undefined ? {} : { model: trace.router.model }),
     selectedCount: trace.decisions.filter((d) => d.selected).length,
@@ -36,6 +38,7 @@ export function traceDetailView(trace: RouteTrace) {
       contentHash: d.contentHash,
       probability: d.probability,
       selected: d.selected,
+      injected: trace.delivery?.injectedSkillIds.includes(d.skillId) ?? false,
     })),
     diagnostics: trace.diagnostics.map((d) => ({
       code: d.code,

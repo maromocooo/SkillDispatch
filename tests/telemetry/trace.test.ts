@@ -123,7 +123,7 @@ describe("route trace v1 privacy and schema", () => {
   });
   it.each([
     { cwd: "/private" },
-    { mode: "advisory" },
+    { mode: "enforce" },
     { schemaVersion: "2.0" },
     { prompt: { storage: "none", hash: digest("x") } },
     { prompt: { storage: "hash", raw: "private" } },
