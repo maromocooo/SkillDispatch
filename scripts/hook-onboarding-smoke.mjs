@@ -66,6 +66,7 @@ try {
       timeout: 10000,
     });
     assert.equal(result.error, undefined);
+    assert.equal(result.stderr, "");
     assert.ok(!(result.stdout + result.stderr).includes("PRIVATE_SENTINEL"));
     assert.equal(
       result.status,

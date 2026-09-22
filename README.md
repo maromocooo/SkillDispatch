@@ -7,7 +7,8 @@ or multiple skills**. It provides Codex and Claude Code discovery, a normalized
 catalog, pure selection policy, a TypeSafe Jev provider and an offline mock provider.
 
 **Status:** PR6 development preview: discovery, routing, evaluation, and silent
-shadow hooks with private local JSONL traces and local trace inspection. Real Jev routing quality has not been
+shadow hooks with private local JSONL traces, local trace inspection, and safe user-scope
+hook registration. Real Jev routing quality has not been
 established. Advisory injection and Agent Skill Studio are not implemented.
 
 ## Install from source
@@ -58,6 +59,14 @@ skilldispatch eval evals/example.yaml --min-recall 0.90 --min-precision 0.90
 # Host command hooks supply their UserPromptSubmit JSON on stdin.
 skilldispatch hook codex
 skilldispatch hook claude
+
+skilldispatch hooks status --json
+skilldispatch hooks install codex --dry-run
+skilldispatch hooks install codex
+skilldispatch hooks install claude
+skilldispatch hooks install claude --sync
+skilldispatch hooks uninstall codex
+skilldispatch hooks uninstall claude
 
 skilldispatch doctor
 skilldispatch doctor --json
@@ -317,16 +326,84 @@ and decisions, but synchronous hooks still add bounded latency. `selected` means
 **recommended by SkillDispatch's policy**, not that the host invoked or followed
 a skill or that output quality improved.
 
-### Enable manually
+### Quick start: register shadow hooks
 
-After installing the CLI, add the following to the appropriate host settings.
-Make the executable and `TYPESAFE_API_KEY` available to the host process; use an
-absolute executable path if its PATH differs from your shell. No installer or
-settings mutation is provided. Retain any existing hooks when editing these files.
+1. Install the built package as described above.
+2. Make `TYPESAFE_API_KEY` available to your coding agent process, including GUI
+   launches. SkillDispatch never copies credentials into host settings.
+3. Run `skilldispatch hooks install codex` and/or `skilldispatch hooks install claude`.
+4. Review and trust the new definition in Codex `/hooks`; registration alone is
+   not host approval. Restart/reload hosts as their settings lifecycle requires.
+5. Run `skilldispatch doctor`, use the agents normally, then inspect
+   `skilldispatch traces summary` and `skilldispatch traces list`.
+
+Registration is **async shadow by default**: agent processing can proceed while
+routing runs in the background. No context is injected, even with the optional
+`hooks install codex --sync` / `hooks install claude --sync` debug mode. Sync adds
+bounded prompt latency. Repeating install is idempotent; `--sync` updates only
+SkillDispatch's execution mode/timeout. A later install without `--sync` restores async.
+
+Use `hooks status [codex|claude] --json` for a read-only report. Omit the host to
+inspect both. `hooks uninstall codex` / `hooks uninstall claude` remove only the
+current installation's canonical registration; they never restore an entire
+backup or delete the config file. Install/uninstall accept `--dry-run`, which
+creates no directories, backup, lock or config. Status and registration management
+are offline; they do not route prompts or write traces.
+
+The installer edits only `~/.codex/hooks.json` and `~/.claude/settings.json`.
+It never edits project, managed, system or plugin settings. Non-default
+`CODEX_HOME` / `CLAUDE_CONFIG_DIR` overrides require manual setup; the installer
+refuses them rather than guessing whether they refer to a user or project layer.
+It checks Codex `~/.codex/config.toml` read-only. Any top-level inline `hooks`
+configuration causes `conflict` / manual action required: current Codex loads both
+user sources and warns. SkillDispatch never migrates or rewrites TOML automatically.
+
+Existing unrelated settings, hook handlers, JSON numeric/string values and file
+permissions are preserved. Strict JSON is required (no comments, trailing commas
+or duplicate keys); files are bounded to 1 MiB and must be owned regular files,
+not symlinks/hardlinks. POSIX files/directories must not be group/world writable.
+New configs/directories use 0600/0700 where supported. Writes use an exclusive
+cooperative lock, same-directory temporary file, fsync and atomic rename, with
+external-change checks before replacement. A crash can leave a `.skilldispatch.lock`;
+remove it manually only after verifying no installer is running. There is no stale-lock stealing.
+
+The first actual edit to an existing file saves a private, same-directory
+`hooks.json.skilldispatch.bak` or `settings.json.skilldispatch.bak`. Existing safe
+backups are never overwritten. No backup is needed for an absent new file. Keep
+backups private: they may contain unrelated credentials already in your settings.
+They are never printed or automatically restored. Inspect/move them yourself if
+needed. Concurrent editors should be closed; filesystem checks cannot provide a
+transaction against another process editing the same file at the final rename instant.
+
+Commands pin the **real absolute Node executable and CLI entrypoint**, avoiding GUI
+PATH differences. Codex uses literal shell quoting; Claude uses the current official
+`command` + `args` exec form, with no shell. Moving/removing the package or Node
+installation breaks these paths: uninstall using the old installation before moving,
+then reinstall. Obvious legacy/other SkillDispatch commands cause manual conflict;
+arbitrary custom wrappers cannot reliably be identified. Uninstall never deletes by
+fuzzy matching. Status shows only SkillDispatch's own command, never unrelated
+commands or settings. Its text/JSON command paths can reveal your home directory;
+redact these paths before sharing status output. Windows command generation is
+unit-tested (Codex uses Windows PowerShell encoded commands; Claude uses node.exe);
+native Windows host execution and ACL durability are not certified.
+
+Async telemetry is **best effort**. Codex cancels unfinished background hooks when
+the session ends; Claude may terminate them when non-interactive sessions end.
+**Missing trace does not mean the router selected no skills.** Host lifecycle,
+permissions/trust and host-level disable settings still control execution. Current
+Claude ordinary async hooks do not enforce the command `timeout` once running;
+SkillDispatch retains its own 4-second process cutoff. No delivery guarantee or
+host async lifecycle emulation is implemented.
+
+### Manual alternative and Codex inline conflict
+
+Retain existing settings when editing manually. These user-scope JSON examples use
+async command hooks; replace the illustrative command with an absolute command if
+PATH differs in the host. The installer generates safer absolute commands for you.
 
 For [Codex hooks](https://learn.chatgpt.com/docs/hooks), use
-`~/.codex/hooks.json` or a trusted project's `.codex/hooks.json`. Review/trust
-the hook definition in Codex before it runs; avoid registering it in both places:
+`~/.codex/hooks.json`. Review/trust the definition before it runs. If your user
+config already uses inline hooks, keep that source instead of creating hooks.json:
 
 ```json
 {
@@ -335,6 +412,7 @@ the hook definition in Codex before it runs; avoid registering it in both places
       "hooks": [{
         "type": "command",
         "command": "skilldispatch hook codex",
+        "async": true,
         "timeout": 5
       }]
     }]
@@ -342,8 +420,16 @@ the hook definition in Codex before it runs; avoid registering it in both places
 }
 ```
 
+Example inline Codex registration to merge manually into an existing
+`~/.codex/config.toml` (do not add it if the same registration is in hooks.json):
+
+```toml
+[[hooks.UserPromptSubmit]]
+hooks = [{ type = "command", command = "skilldispatch hook codex", async = true, timeout = 5 }]
+```
+
 For [Claude Code hooks](https://code.claude.com/docs/en/hooks), add to
-`~/.claude/settings.json` or the project's `.claude/settings.json`:
+`~/.claude/settings.json`:
 
 ```json
 {
@@ -352,6 +438,7 @@ For [Claude Code hooks](https://code.claude.com/docs/en/hooks), add to
       "hooks": [{
         "type": "command",
         "command": "skilldispatch hook claude",
+        "async": true,
         "timeout": 5
       }]
     }]
@@ -359,7 +446,8 @@ For [Claude Code hooks](https://code.claude.com/docs/en/hooks), add to
 }
 ```
 
-Both examples use **seconds**. Five seconds gives headroom around the default
+Timeout fields use **seconds**; Claude does not enforce this field after a normal async
+hook starts. For synchronous execution, five seconds gives headroom around the default
 2,500 ms route timeout. SkillDispatch limits stdin to 1 MiB / 1 second and the
 dedicated CLI hook process to 4 seconds, including setup/storage. The latter is
 an emergency cutoff; it may leave no trace. Claude's synchronous UserPromptSubmit
@@ -574,7 +662,8 @@ It is never run by `pnpm test` or CI automatically.
 Tests use temporary homes/repositories and fixtures instead of the developer's
 personal skills. No external API is used: SDK tests use fake fetch or loopback
 HTTP in child processes. Format with `pnpm format`. See
-[PR5 validation](docs/PR5_VALIDATION.md) for operational commands and installed-package checks,
+[PR5 validation](docs/PR5_VALIDATION.md) for trace operations,
+[PR6 validation](docs/PR6_VALIDATION.md) for registration management and installed-package checks,
 [PR4 validation](docs/PR4_VALIDATION.md) for hooks and trace privacy,
 [PR3 validation](docs/PR3_VALIDATION.md) for eval checks, and
 [PR2 validation](docs/PR2_VALIDATION.md) for the unchanged SDK boundary.
@@ -607,14 +696,23 @@ After adding the shadow hook commands from the setup examples above, run
 `skilldispatch doctor`. It checks Node 20+, trusted config and user config location,
 hook project trust, both skill catalogs, provider and credential presence, private
 data/key/trace storage, the shipped schema and valid/invalid trace counts.
-It confirms hook **commands are available**, not that hosts have registered them.
+It also inspects user hook registrations as installed/not-installed/conflict. Missing,
+malformed, unsafe or conflicting host hook config is WARN (doctor remains usable
+unless another check FAILs). Codex registration retains a trust-not-verified WARN;
+Claude `disableAllHooks` is reported. Project/managed/plugin layers and host approval
+are not certified. No unrelated host command or config contents are displayed.
 
 `doctor --json` returns `{version, usable, checks}` with PASS/WARN/FAIL checks.
 Exit 0 means no FAIL; exit 1 means a configuration or installation problem. Missing
 Jev credentials, a first-run missing key/trace and corrupt JSONL lines are WARN.
 Malformed settings, invalid credentials, unsafe storage or unwritable trace
 destinations are FAIL. Missing credentials still prevent useful Jev routing even
-though offline installation checks can complete successfully.
+though offline installation checks can complete successfully. The separate
+`routing_ready` check is true only when local provider prerequisites pass (mock,
+or a valid-shaped Jev key) and shadow telemetry is enabled. It is false/WARN for
+missing/invalid keys, disabled telemetry, or unreadable routing config. It does
+not prove online authentication, host registration/trust or trace delivery.
+`hooks status` returns exit 1 for conflicts; an absent registration alone is exit 0.
 
 Doctor makes no API calls, creates no key/directories/files, changes no host
 settings and appends no traces. Writability is a permission probe, not a disk-space

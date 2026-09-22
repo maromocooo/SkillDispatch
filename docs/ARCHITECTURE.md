@@ -1,10 +1,10 @@
 # Architecture
 
-## Implemented PR5 boundary
+## Implemented PR6 boundary
 
 The shipped implementation is a single `skilldispatch` package with separate ESM
 library and CLI entry points. Discovery, Jev/mock routing, routing evaluation,
-shadow hooks, local traces, offline doctor and trace analytics are active. Advisory/enforce behavior is deferred.
+shadow hooks, local traces, offline doctor, trace analytics and user hook registration are active. Advisory/enforce behavior is deferred.
 
 ```text
 cli/program + commands
@@ -21,7 +21,9 @@ cli/program + commands
        -> telemetry/trace -> privacy + fingerprint -> JsonlTraceSink
   -> ops/context -> trusted config + telemetry storage paths
        -> telemetry/reader -> analytics + views -> traces CLI
-  -> ops/doctor -> config + discovery + read-only storage/schema checks
+  -> registration/inspect + command -> user host settings (read-only status)
+       -> document + manage + atomic (explicit install/uninstall only)
+  -> ops/doctor -> registration/inspect + config + discovery + storage/schema checks
 ```
 
 `RouterProvider.judge` is the provider contract. Every eligible candidate must be
@@ -441,8 +443,8 @@ incomplete final line. Consumers should tolerate a damaged trailing line.
 Network filesystem append/link guarantees are not assumed.
 
 No trace is written by discover/route/eval. `telemetry.enabled: false` skips hook
-routing/storage. There is no retention manager, upload or automatic settings
-mutation. Prompt hashing changes local storage only: Jev still receives the
+routing/storage. There is no retention manager or upload. Hook runtime never
+mutates host settings; explicit registration management is separate. Prompt hashing changes local storage only: Jev still receives the
 prompt and routing descriptions under the existing request privacy contract.
 Text absent from the host hook is not reconstructed from transcripts or images.
 
@@ -536,7 +538,7 @@ Agent/outcome filters and positive integer hour/day `--since` windows are local:
 since and now inclusive, future excluded only when a window is requested.
 
 Doctor never constructs a provider, authenticates online or mutates files. It
-reports command availability without claiming host registration. Existing key
+reports command availability and read-only user registration inspection, without claiming host trust or delivery. Existing key
 health checks permissions, regular single-link identity, readability and 32-byte
 size without exposing content or creating a missing key. Destination checks use
 permission probes and nearest existing writable ancestor for missing directories;
@@ -550,3 +552,65 @@ absolute skill paths, diagnostic messages and correlation data are not.
 The historical PR4 contract remains unchanged. This stage supplies only local
 operational visibility: no context injection, invocation tracking, cloud upload,
 trace mutation or automatic optimization. See [PR5 validation](PR5_VALIDATION.md).
+
+
+## Safe hook onboarding (PR6)
+
+`registration/` is outside core and routing. `command.ts` resolves the real running
+Node and CLI entrypoint. Codex POSIX commands quote each literal argument; Windows
+commands encode a PowerShell script as UTF-16LE Base64 with literal single-quoted
+paths. Claude uses the official exec form (`command` + literal `args`), avoiding
+shell evaluation entirely. Relative/control-character/host-placeholder paths are
+refused. Status never serializes unrelated commands/config values.
+
+`inspect.ts` reads only user `.codex/hooks.json`, `.codex/config.toml` and
+`.claude/settings.json`. Top-level TOML hooks cause Codex conflict because the two
+same-layer sources both load. Custom host-directory overrides are refused for
+automatic management. The inspector does not follow project/plugin/managed layers,
+claim Codex trust, or infer that a registered handler ran. Claude user
+`disableAllHooks` is an issue; other layers can still affect actual execution.
+
+`document.ts` validates strict, bounded JSON, including duplicate-key and structure
+checks. Exact `UserPromptSubmit` + `type: command` + canonical command/args identify
+ownership. Optional Windows overrides exclude ownership. A heuristic can only
+signal manual conflict, never authorize deletion. Syntax-tree edits through pinned
+`jsonc-parser` preserve unrelated values, including numeric lexemes that JSON.parse
+plus JSON.stringify would round. Uninstall removes only owned handlers and their
+empty plain group; event/object containers may remain. No whole-backup restore.
+
+`files.ts` performs lstat/no-follow/nonblocking reads with descriptor identity checks,
+regular/nlink=1/current-owner checks and POSIX no-group/world-write permissions.
+Host configs may be 0644; their existing permissions are preserved. New files are
+0600 and new host directories 0700. Both read and proposed output are bounded to
+1 MiB. Invalid UTF-8/JSON/TOML and unsafe paths produce fixed error codes, not excerpts.
+
+`manage.ts` reuses inspection/planning for dry-run and actual edits. Actual changes
+acquire an exclusive cooperative `.skilldispatch.lock`, reread/replan, write a
+same-directory unique temporary file, fsync, compare the original again, and rename.
+Codex inline conflict is checked again before rename. Directory fsync is best effort.
+The first modification of an existing config publishes a 0600 same-directory
+`.skilldispatch.bak` exclusively; an existing safe backup is retained forever.
+A failed replacement leaves the original intact (a backup can already exist).
+No stale lock is stolen. This guards cooperating installers and detected external
+edits, not arbitrary malicious same-user races at the final rename boundary.
+
+Install defaults to `async: true`, `timeout: 5` seconds. `--sync` changes async to
+false, with no context output or routing change. The existing hook runtime retains
+its own 4-second cutoff, 1-second bounded stdin, and 2500 ms routing deadline.
+Claude does not enforce `timeout` on already-running ordinary async hooks. Async
+session lifecycle is host-owned: cancellation/teardown may omit traces; absence is
+not a no-skill decision. Codex trust review remains necessary after registration.
+
+CLI composition uses this layer for `hooks status/install/uninstall`; doctor reuses
+read-only inspection. Hook conflicts are WARN in doctor, conflict exit 1 in status,
+and safe refusal for install. Missing registrations are WARN in doctor, exit 0 in
+status. `routing_ready` is a separate boolean local-prerequisite check: provider
+setup plus telemetry enabled, not authentication, host approval, or delivery.
+Existing FAIL/usable doctor semantics otherwise remain. No API request, key creation,
+trace append or mutation occurs during status/doctor. Dry-run does not create even
+an absent directory or backup. Registration operations never read SkillDispatch
+project config to select a destination.
+
+See [PR6 validation](PR6_VALIDATION.md) for official host references and runtime
+verification. This phase adds no advisory/context injection, project registration,
+host settings migration, invocation tracking, delivery queue or cloud functionality.
