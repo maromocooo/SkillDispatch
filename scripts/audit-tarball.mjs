@@ -29,7 +29,7 @@ export function auditTarball(tarball) {
     );
     const content = read(["-xOzf", resolve(tarball), path]);
     assert.ok(
-      !/\/Users\/(?:shunsmae|shunsuke)|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|(?:gh[pousr]_|npm_)[A-Za-z0-9]{30,}/u.test(
+      !/\/Users\/[A-Za-z0-9._-]+\/|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|(?:gh[pousr]_|npm_)[A-Za-z0-9]{30,}/u.test(
         content,
       ),
       "Sensitive content detected in package",
