@@ -24,6 +24,18 @@
       "type": "string",
       "enum": ["shadow", "advisory"]
     },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "skillInvocationTelemetry": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": ["skillInvocationTelemetry"],
+      "additionalProperties": false,
+      "description": "Local observer registration and storage prerequisites checked at routing time; async delivery remains best effort."
+    },
     "delivery": {
       "type": "object",
       "properties": {
@@ -197,6 +209,11 @@
           "contentHash": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "catalogIdentity": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Path-free adapter-owned catalog identity for exact version correlation."
           },
           "probability": {
             "type": "number",

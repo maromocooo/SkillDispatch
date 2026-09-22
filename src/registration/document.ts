@@ -10,6 +10,7 @@ import {
 import { type CommandSpec, type Host, RegistrationError } from "./types.js";
 
 export interface HandlerLocation {
+  matcher?: unknown;
   group: number;
   handler: number;
   value: Record<string, unknown>;
@@ -36,33 +37,43 @@ export class HookDocument {
     visit(root, 0);
     this.root = root;
     const hooks = this.node(["hooks"]);
-    const event = this.node(["hooks", "UserPromptSubmit"]);
-    if ((hooks && hooks.type !== "object") || (event && event.type !== "array"))
-      throw new RegistrationError("malformed_hook_structure");
-    for (const group of event?.children ?? []) {
-      const handlers = findNodeAtLocation(group, ["hooks"]);
+    for (const name of [
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PostToolUse",
+      "PostToolUseFailure",
+    ]) {
+      const event = this.node(["hooks", name]);
       if (
-        group.type !== "object" ||
-        !handlers ||
-        handlers.type !== "array" ||
-        handlers.children?.some((h) => h.type !== "object")
+        (hooks && hooks.type !== "object") ||
+        (event && event.type !== "array")
       )
         throw new RegistrationError("malformed_hook_structure");
+      for (const group of event?.children ?? []) {
+        const handlers = findNodeAtLocation(group, ["hooks"]);
+        if (
+          group.type !== "object" ||
+          !handlers ||
+          handlers.type !== "array" ||
+          handlers.children?.some((h) => h.type !== "object")
+        )
+          throw new RegistrationError("malformed_hook_structure");
+      }
     }
   }
   node(path: (string | number)[]) {
     return findNodeAtLocation(this.root, path);
   }
-  handlers(): HandlerLocation[] {
-    return (this.node(["hooks", "UserPromptSubmit"])?.children ?? []).flatMap(
-      (group, i) =>
-        (findNodeAtLocation(group, ["hooks"])?.children ?? []).map(
-          (handler, j) => ({
-            group: i,
-            handler: j,
-            value: getNodeValue(handler) as Record<string, unknown>,
-          }),
-        ),
+  handlers(event = "UserPromptSubmit"): HandlerLocation[] {
+    return (this.node(["hooks", event])?.children ?? []).flatMap((group, i) =>
+      (findNodeAtLocation(group, ["hooks"])?.children ?? []).map(
+        (handler, j) => ({
+          matcher: findNodeAtLocation(group, ["matcher"])?.value,
+          group: i,
+          handler: j,
+          value: getNodeValue(handler) as Record<string, unknown>,
+        }),
+      ),
     );
   }
 }
@@ -118,10 +129,16 @@ export function planDocument(
   command: CommandSpec,
   action: "install" | "uninstall",
   sync = false,
+  event = "UserPromptSubmit",
+  matcher?: string,
 ) {
   const owned = document
-    .handlers()
-    .filter((h) => ownsHandler(h.value, command));
+    .handlers(event)
+    .filter(
+      (h) =>
+        ownsHandler(h.value, command) &&
+        (matcher === undefined || h.matcher === matcher),
+    );
   let text = document.text;
   if (action === "install") {
     if (owned.length > 1) throw new RegistrationError("duplicate_registration");
@@ -135,14 +152,7 @@ export function planDocument(
         if (handler.value[key] !== value)
           text = edit(
             text,
-            [
-              "hooks",
-              "UserPromptSubmit",
-              handler.group,
-              "hooks",
-              handler.handler,
-              key,
-            ],
+            ["hooks", event, handler.group, "hooks", handler.handler, key],
             value,
           );
       }
@@ -152,31 +162,36 @@ export function planDocument(
       };
     }
     const group = {
+      ...(matcher === undefined ? {} : { matcher }),
       hooks: [{ type: "command", ...command, async: !sync, timeout: 5 }],
     };
-    if (document.node(["hooks", "UserPromptSubmit"]))
-      text = edit(text, ["hooks", "UserPromptSubmit", -1], group, true);
-    else text = edit(text, ["hooks", "UserPromptSubmit"], [group]);
+    if (document.node(["hooks", event]))
+      text = edit(text, ["hooks", event, -1], group, true);
+    else text = edit(text, ["hooks", event], [group]);
     return { text, action: "install" };
   }
   for (const entry of [...owned].reverse()) {
     const current = new HookDocument(text);
-    const group = current.node(["hooks", "UserPromptSubmit", entry.group]);
-    const handlers = current.node([
-      "hooks",
-      "UserPromptSubmit",
-      entry.group,
-      "hooks",
-    ]);
-    if (group?.children?.length === 1 && handlers?.children?.length === 1)
-      text = edit(text, ["hooks", "UserPromptSubmit", entry.group], undefined);
+    const group = current.node(["hooks", event, entry.group]);
+    const handlers = current.node(["hooks", event, entry.group, "hooks"]);
+    if (
+      group?.children?.length === (matcher === undefined ? 1 : 2) &&
+      handlers?.children?.length === 1
+    )
+      text = edit(text, ["hooks", event, entry.group], undefined);
     else
       text = edit(
         text,
-        ["hooks", "UserPromptSubmit", entry.group, "hooks", entry.handler],
+        ["hooks", event, entry.group, "hooks", entry.handler],
         undefined,
       );
   }
+  if (
+    matcher !== undefined &&
+    owned.length &&
+    new HookDocument(text).node(["hooks", event])?.children?.length === 0
+  )
+    text = edit(text, ["hooks", event], undefined);
   return {
     text,
     action: text === document.text ? "not-installed" : "uninstall",

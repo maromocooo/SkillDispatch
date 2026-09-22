@@ -905,3 +905,10 @@ on stdin. It is local-only, silent, and fail-open. Events go to the private
 `invocations.jsonl` in the SkillDispatch data directory, separately from routing
 traces. Arguments, tool responses, errors, transcripts and raw host IDs are not
 persisted. Only exact native identifier matches resolve to catalog metadata.
+
+Run `skilldispatch hooks install claude` to reconcile the routing hook and the
+three `Skill` observers together. Observers always use `async: true`; advisory
+`UserPromptSubmit` remains synchronous. `hooks status claude` lists each observer;
+`doctor` checks `skill_invocation_telemetry_ready` independently of advisory.
+Observer persistence uses user configuration only, even if project routing
+configuration was explicitly trusted. It never invokes Jev.

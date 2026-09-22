@@ -20,6 +20,7 @@ export interface TraceInput {
   agent: RouteTrace["agent"];
   mode?: RouteTrace["mode"];
   delivery?: RouteTrace["delivery"];
+  capabilities?: RouteTrace["capabilities"];
   prompt: string;
   sessionId: string;
   promptCorrelationId?: string;
@@ -63,6 +64,9 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
     agent,
     mode: input.mode ?? "shadow",
     ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
+    ...(input.capabilities === undefined
+      ? {}
+      : { capabilities: input.capabilities }),
     prompt: privatePrompt(input.prompt, input.promptStorage ?? "hash", key),
     host: {
       event: "UserPromptSubmit",
@@ -102,6 +106,9 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
         agent: skill.agent,
         scope: skill.scope,
         contentHash: skill.contentHash,
+        ...(digestSchema.safeParse(skill.metadata.catalogIdentity).success
+          ? { catalogIdentity: skill.metadata.catalogIdentity }
+          : {}),
         probability: decision.probability,
         selected: decision.selected,
       };

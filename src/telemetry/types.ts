@@ -15,6 +15,12 @@ export const routeTraceSchema = z
     timestamp: z.iso.datetime(),
     agent: z.enum(["codex", "claude-code"]),
     mode: z.enum(["shadow", "advisory"]),
+    capabilities: z
+      .strictObject({ skillInvocationTelemetry: z.literal(true) })
+      .describe(
+        "Local observer registration and storage prerequisites checked at routing time; async delivery remains best effort.",
+      )
+      .optional(),
     delivery: z
       .strictObject({
         kind: z.enum(["none", "claude-advisory"]),
@@ -66,6 +72,11 @@ export const routeTraceSchema = z
         agent: z.enum(["codex", "claude-code", "generic"]),
         scope: z.enum(["repo", "user", "admin", "system", "unknown"]),
         contentHash: digestSchema,
+        catalogIdentity: digestSchema
+          .describe(
+            "Path-free adapter-owned catalog identity for exact version correlation.",
+          )
+          .optional(),
         probability: z.number().min(0).max(1),
         selected: z
           .boolean()

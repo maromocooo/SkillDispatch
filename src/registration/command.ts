@@ -50,3 +50,12 @@ export function shadowCommand(
   }
   return { command: argv.map(posixQuote).join(" ") };
 }
+
+/** Claude exec-form argv, with no shell interpolation. */
+export function skillObserverCommand(execution: CliExecution): CommandSpec {
+  const base = shadowCommand("claude", execution);
+  return {
+    command: base.command,
+    args: [execution.cliPath, "hook", "claude-skill"],
+  };
+}

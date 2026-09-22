@@ -55,6 +55,41 @@ async function fixture(mode = "advisory") {
   };
 }
 describe("mode-aware shared runtime", () => {
+  it.each([true, false])(
+    "records invocation capability only when confirmed: %s",
+    async (available) => {
+      const f = await fixture();
+      await f.run({ invocationAvailable: async () => available });
+      const trace = (await f.traces())[0];
+      expect(trace?.capabilities).toEqual(
+        available ? { skillInvocationTelemetry: true } : undefined,
+      );
+      expect(
+        trace?.decisions
+          .filter((d) => d.agent === "claude-code")
+          .every((d) => /^[a-f0-9]{64}$/.test(d.catalogIdentity ?? "")),
+      ).toBe(true);
+      expect((await schemaValidator())(trace)).toBe(true);
+    },
+  );
+  it("omits capability when prompt correlation is unavailable", async () => {
+    const f = await fixture();
+    delete f.input.promptCorrelationId;
+    await f.run({ invocationAvailable: async () => true });
+    expect((await f.traces())[0]?.capabilities).toBeUndefined();
+  });
+  it("keeps advisory usable when observer availability check fails", async () => {
+    const f = await fixture();
+    expect(
+      await f.run({
+        invocationAvailable: async () => {
+          throw new Error("PRIVATE");
+        },
+      }),
+    ).toBeDefined();
+    expect((await f.traces())[0]?.capabilities).toBeUndefined();
+  });
+
   it("keeps positive shadow routing silent and records no injections", async () => {
     const f = await fixture("shadow");
     const check = vi.fn();

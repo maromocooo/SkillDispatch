@@ -71,7 +71,19 @@ describe("hooks CLI", () => {
           execution: null,
           command: null,
           configSource: "~/.claude/settings.json",
-          issues: [],
+          issues: ["skill_invocation_telemetry_incomplete"],
+          skillObservers: {
+            ready: false,
+            events: ["PreToolUse", "PostToolUse", "PostToolUseFailure"].map(
+              (event) => ({
+                event,
+                matcher: "Skill",
+                registration: "not-installed",
+                execution: null,
+                registrations: 0,
+              }),
+            ),
+          },
           registrations: 0,
         },
       ],

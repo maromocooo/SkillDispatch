@@ -103,6 +103,16 @@ describe.each(["codex", "claude"] as const)(
         before.hooks.UserPromptSubmit[0],
       );
       after.hooks.UserPromptSubmit.pop();
+      if (host === "claude")
+        for (const event of [
+          "PreToolUse",
+          "PostToolUse",
+          "PostToolUseFailure",
+        ]) {
+          expect(after.hooks[event]).toHaveLength(1);
+          expect(after.hooks[event][0].matcher).toBe("Skill");
+          delete after.hooks[event];
+        }
       expect(after).toEqual(before);
       expect(await readFile(`${ctx.path}.skilldispatch.bak`, "utf8")).toBe(
         text,

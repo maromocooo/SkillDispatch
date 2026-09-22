@@ -1,6 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { parse as parseToml } from "smol-toml";
-import { shadowCommand } from "./command.js";
+import { invocationEvents } from "../observability/invocation-types.js";
+import { shadowCommand, skillObserverCommand } from "./command.js";
 import { HookDocument, ownsHandler, possibleOtherInstall } from "./document.js";
 import { readHostFile } from "./files.js";
 import { registrationMode } from "./mode.js";
@@ -121,6 +122,57 @@ export async function inspectRegistration(
       status.issues.push("host_hooks_disabled");
     if (matching.length && status.execution !== status.expectedExecution)
       status.issues.push("hook_execution_mismatch");
+    if (host === "claude") {
+      const observer = skillObserverCommand(execution);
+      const events = invocationEvents.map((event) => {
+        const owned = document
+          .handlers(event)
+          .filter((h) => ownsHandler(h.value, observer));
+        const first = owned[0];
+        const conflict =
+          owned.length > 1 ||
+          owned.some(
+            (h) =>
+              h.matcher !== "Skill" ||
+              h.value.asyncRewake === true ||
+              h.value.if !== undefined ||
+              (h.value.async !== undefined &&
+                typeof h.value.async !== "boolean"),
+          ) ||
+          document
+            .handlers(event)
+            .some(
+              (h) =>
+                !ownsHandler(h.value, observer) &&
+                possibleOtherInstall(h.value, host),
+            );
+        return {
+          event,
+          matcher: "Skill" as const,
+          registration: conflict
+            ? ("conflict" as const)
+            : first
+              ? ("installed" as const)
+              : ("not-installed" as const),
+          execution: first
+            ? first.value.async === true
+              ? ("async" as const)
+              : ("sync" as const)
+            : null,
+          registrations: owned.length,
+        };
+      });
+      status.skillObservers = {
+        ready:
+          document.node(["disableAllHooks"])?.value !== true &&
+          events.every(
+            (e) => e.registration === "installed" && e.execution === "async",
+          ),
+        events,
+      };
+      if (!status.skillObservers.ready)
+        status.issues.push("skill_invocation_telemetry_incomplete");
+    }
     if (host === "codex" && matching.length)
       status.issues.push("codex_host_trust_not_verified");
   } catch (error) {
@@ -132,4 +184,11 @@ export async function inspectRegistration(
     ];
   }
   return status;
+}
+
+/** Observer readiness is independent of same-turn advisory readiness. */
+export function routingRegistrationIssues(status: HookStatus): string[] {
+  return status.issues.filter(
+    (code) => code !== "skill_invocation_telemetry_incomplete",
+  );
 }

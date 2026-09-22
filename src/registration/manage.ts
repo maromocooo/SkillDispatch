@@ -1,6 +1,16 @@
+import { invocationEvents } from "../observability/invocation-types.js";
 import { atomicRegistrationWrite, withRegistrationLock } from "./atomic.js";
-import { resolveExecution, shadowCommand } from "./command.js";
-import { ownsHandler, planDocument, possibleOtherInstall } from "./document.js";
+import {
+  resolveExecution,
+  shadowCommand,
+  skillObserverCommand,
+} from "./command.js";
+import {
+  HookDocument,
+  ownsHandler,
+  planDocument,
+  possibleOtherInstall,
+} from "./document.js";
 import { MAX_HOST_CONFIG_BYTES, unchanged } from "./files.js";
 import { checkCodexInline, loadRegistration } from "./inspect.js";
 import { registrationMode } from "./mode.js";
@@ -59,7 +69,48 @@ export async function manageRegistration(
         throw new RegistrationError(
           "modified_registration_manual_action_required",
         );
-      const plan = planDocument(loaded.document, command, action, sync);
+      let plan = planDocument(loaded.document, command, action, sync);
+      if (host === "claude") {
+        const observer = skillObserverCommand(resolved);
+        for (const event of invocationEvents) {
+          const document = new HookDocument(plan.text);
+          if (
+            action === "install" &&
+            document
+              .handlers(event)
+              .some(
+                (h) =>
+                  (ownsHandler(h.value, observer) &&
+                    (h.matcher !== "Skill" ||
+                      h.value.asyncRewake === true ||
+                      h.value.if !== undefined)) ||
+                  (!ownsHandler(h.value, observer) &&
+                    possibleOtherInstall(h.value, host)),
+              )
+          )
+            throw new RegistrationError(
+              "modified_observer_registration_manual_action_required",
+            );
+          const next = planDocument(
+            document,
+            observer,
+            action,
+            false,
+            event,
+            "Skill",
+          );
+          if (next.text !== plan.text)
+            plan = {
+              text: next.text,
+              action:
+                action === "uninstall"
+                  ? "uninstall"
+                  : plan.action === "install"
+                    ? "install"
+                    : "update",
+            };
+        }
+      }
       if (Buffer.byteLength(plan.text) > MAX_HOST_CONFIG_BYTES)
         throw new RegistrationError("config_too_large");
       return { ...loaded, plan };

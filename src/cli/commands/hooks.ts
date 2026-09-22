@@ -36,6 +36,15 @@ export async function hooksStatus(
       io.stdout(
         `${status.host}\tmode: ${status.mode ?? "unknown"}\t${status.registration}\t${status.execution ?? "-"}\nConfig source: ${status.configSource}\n`,
       );
+      if (status.skillObservers) {
+        io.stdout(
+          `Claude Skill observers: ${status.skillObservers.ready ? "installed" : "incomplete"}\n`,
+        );
+        for (const event of status.skillObservers.events)
+          io.stdout(
+            `  ${event.event} Skill: ${event.registration} ${event.execution ?? "-"}\n`,
+          );
+      }
       if (status.command)
         io.stdout(
           `Command: ${terminalText(status.command.command)}${status.command.args ? ` ${terminalText(JSON.stringify(status.command.args))}` : ""}\n`,

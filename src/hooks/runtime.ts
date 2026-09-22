@@ -2,6 +2,7 @@ import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { route } from "../core/route.js";
 import type { RouteResult } from "../core/types.js";
+import { invocationPath } from "../observability/invocation-storage.js";
 import type { RouterProvider } from "../providers/types.js";
 import {
   createProvider,
@@ -9,6 +10,7 @@ import {
   type RuntimeEnvironment,
 } from "../runtime/context.js";
 import { JsonlTraceSink } from "../telemetry/jsonl.js";
+import { assertTraceDestination } from "../telemetry/reader.js";
 import {
   dataDirectory,
   installationKey,
@@ -25,6 +27,7 @@ interface HookServices {
   getKey: typeof installationKey;
   makeSink: (path: string) => TraceSink;
   canAdvise: () => Promise<boolean>;
+  invocationAvailable: () => Promise<boolean>;
   buildAdvisory: typeof buildClaudeAdvisory;
 }
 
@@ -42,6 +45,7 @@ export async function runHook(
       getKey: installationKey,
       makeSink: (path) => new JsonlTraceSink(path),
       canAdvise: async () => false,
+      invocationAvailable: async () => false,
       buildAdvisory: buildClaudeAdvisory,
       ...overrides,
     };
@@ -57,6 +61,7 @@ export async function runHook(
     const directory = dataDirectory(environment);
     // A configured trace destination must never append JSON into the installation key.
     if (path === join(directory, "install.key")) return;
+    await assertTraceDestination(path, [invocationPath(environment)]);
     const key = await services.getKey(directory);
     // Parent aliases (for example /tmp and /private/tmp) can name the same key.
     const keyPath = await realpath(join(directory, "install.key"));
@@ -129,7 +134,21 @@ export async function runHook(
         };
       }
     }
+    let invocationAvailable = false;
+    if (
+      input.agent === "claude-code" &&
+      input.promptCorrelationId !== undefined
+    ) {
+      try {
+        invocationAvailable = await services.invocationAvailable();
+      } catch {
+        /* Availability unknown. */
+      }
+    }
     const trace = createRouteTrace({
+      ...(invocationAvailable
+        ? { capabilities: { skillInvocationTelemetry: true as const } }
+        : {}),
       agent: input.agent,
       mode,
       delivery: {

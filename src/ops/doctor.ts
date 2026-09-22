@@ -6,9 +6,13 @@ import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
 import { claudeOriginCounts } from "../discovery/claude-origin.js";
 import { CodexDiscoveryAdapter } from "../discovery/codex.js";
 import { isMissing } from "../discovery/filesystem.js";
+import { invocationPersistenceReady } from "../observability/readiness.js";
 import { validateApiKey } from "../providers/jev/options.js";
 import { resolveExecution } from "../registration/command.js";
-import { inspectRegistration } from "../registration/inspect.js";
+import {
+  inspectRegistration,
+  routingRegistrationIssues,
+} from "../registration/inspect.js";
 import {
   type CliExecution,
   type HookStatus,
@@ -120,6 +124,15 @@ export async function runDoctor(
       registration.registration,
     );
   }
+  const invocationReady =
+    claudeRegistration?.skillObservers?.ready === true &&
+    (await invocationPersistenceReady(environment));
+  add(
+    "skill_invocation_telemetry_ready",
+    invocationReady ? "PASS" : "WARN",
+    "Local observer registrations and private invocation storage prerequisites only; host policy, lifecycle and delivery are not verified.",
+    invocationReady,
+  );
   let loaded: Awaited<ReturnType<typeof loadConfig>>;
   try {
     loaded = await loadConfig({ ...environment, mode: "hook" });
@@ -209,7 +222,7 @@ export async function runDoctor(
     claudeRegistration?.registration === "installed" &&
     claudeRegistration.execution ===
       (claudeMode === "advisory" ? "sync" : "async") &&
-    !claudeRegistration.issues.length;
+    !routingRegistrationIssues(claudeRegistration).length;
   add(
     "hook_mode_claude",
     "PASS",
