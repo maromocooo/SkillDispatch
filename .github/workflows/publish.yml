@@ -50,6 +50,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm pack --pack-destination artifacts
-      - run: node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz --offline
+      - run: node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz
       - name: Publish reviewed tarball using OIDC
         run: npm publish artifacts/skilldispatch-0.1.0.tgz --access public --provenance --ignore-scripts

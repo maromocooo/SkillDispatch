@@ -77,8 +77,9 @@ It works from the checkout and installed package without a key or real-home read
 ## CI and release engineering
 
 - `ci.yml`: PRs, main/feature pushes and manual runs; Ubuntu Node 20/24, frozen
-  installation, tests, typecheck, lint, build, mock benchmark, pack, isolated offline
-  package smoke and artifact upload. No TypeSafe credentials or live API calls.
+  installation, tests, typecheck, lint, build, mock benchmark, pack, isolated
+  package smoke and artifact upload. Package installation can fetch npm dependencies;
+  application smoke remains offline. No TypeSafe credentials or live API calls.
 - `release.yml`: `v*` tags/manual validation, Node 24, package/tag version check,
   complete verification and artifact upload. It does not publish npm or GitHub
   Releases. No tag or release run was created for this task.
@@ -94,7 +95,11 @@ It works from the checkout and installed package without a key or real-home read
   Bug/feature templates and the PR template include privacy and validation guidance.
 - `actionlint` **1.7.12**, downloaded from the official release with its SHA-256
   verified against the release checksum file, passed all workflow files.
-- Remote CI results will be recorded after the first PR10 push.
+- Initial Ubuntu CI passed tests/typecheck/lint/build/pack, but separate offline
+  consumer installation reported `ERR_PNPM_NO_OFFLINE_META`. Frozen root installation
+  does not seed every registry metadata cache entry. Workflows now allow npm
+  registry access for the temporary package install, with all application smoke
+  still using isolated mock fixtures. Final remote CI results are recorded below.
 
 ## Validation results
 
@@ -164,17 +169,18 @@ checks required assets, metadata and obvious private-path/credential patterns.
 Tracked/unignored text was searched for key/token patterns, private-key headers,
 real home paths, email/internal domain names, company/Jira identifiers and raw
 prompt references. No real credential, company-specific data or runtime trace was
-identified. API-key references and sentinel prompts are intentional documentation,
-implementation or test fixtures, not secret values. An existing discovery test's
-`/home/.agents/...` path is synthetic and contains no real username. No tracked
+identified across 246 text files. API-key references and sentinel prompts are intentional
+documentation, implementation or test fixtures, not secret values. Existing tests'
+`/home/.agents/...` and `/home/test/...` paths are synthetic, not real home paths. No tracked
 JSONL runtime data, `.env` or `dist` artifacts were found. The tarball scan passed
 independently. This is a scoped source/artifact check, not a guarantee that every
 possible secret format can be detected automatically.
 
 Tests/application smokes made **no external TypeSafe/Jev calls**. Existing SDK
 transport tests use loopback only. Development network access was for Git/GitHub,
-official npm/GitHub documentation, npm name metadata and actionlint. Package smoke
-used the offline dependency store. SkillDispatch still uploads neither traces nor
+official npm/GitHub documentation, npm name metadata and actionlint. Local package
+smoke used the offline dependency store; CI also permits npm installation downloads.
+SkillDispatch still uploads neither traces nor
 invocation events; normal Jev routing sends only its documented request data.
 
 ## Remaining launch actions

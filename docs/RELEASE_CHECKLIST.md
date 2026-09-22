@@ -9,7 +9,8 @@ post launch material. The release candidate PR prepares artifacts for a maintain
 - [ ] `pnpm install --frozen-lockfile`; tests, typecheck, lint, build on Node 20 and 24.
 - [ ] GitHub CI green on the exact release commit (not merely local equivalents).
 - [ ] `pnpm pack --pack-destination artifacts` and
-  `node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz --offline`.
+  `node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz`.
+  Use `--offline` only with a populated package metadata/content store.
 - [ ] Inspect `node scripts/audit-tarball.mjs artifacts/skilldispatch-0.1.0.tgz`.
   No tests, secrets, private fixtures, logs, local config or runtime data.
 - [ ] Review README links, source/npm quick start, public API, schemas, MIT license,
@@ -32,6 +33,9 @@ post launch material. The release candidate PR prepares artifacts for a maintain
 
 `ci.yml` runs Node 20/24 on PRs and main/feature pushes: frozen install, offline
 application tests, typecheck, lint, build, mock benchmark, pack and isolated smoke.
+Dependency installation may contact npm; all application smoke uses local fixtures
+and mock providers without external model API calls. A frozen lockfile install
+does not necessarily populate metadata required by a separate offline consumer install.
 `release.yml` validates `v*` tags and uploads a candidate artifact only. It does not
 create a GitHub Release or publish a package. `publish.yml` is separate/manual,
 disabled unless repository variable `NPM_PUBLISH_ENABLED` is exactly `true`.
