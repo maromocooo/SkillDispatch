@@ -9,7 +9,7 @@ import { createProgram } from "./program.js";
 // Do not install process lifecycle behavior for library users or other commands.
 const hookInvocation =
   process.argv[2] === "hook" &&
-  ["codex", "claude"].includes(process.argv[3] ?? "") &&
+  ["codex", "claude", "claude-skill"].includes(process.argv[3] ?? "") &&
   process.argv.length === 4;
 const hookDeadline = hookInvocation
   ? setTimeout(() => process.exit(0), 4000)

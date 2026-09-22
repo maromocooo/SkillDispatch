@@ -10,13 +10,14 @@ export class TraceReadError extends Error {
     super("Trace destination is unsafe or unreadable.");
   }
 }
-export type RouteTraceReadResult =
-  | { kind: "valid"; line: number; trace: RouteTrace }
+export type JsonlReadResult<T> =
+  | { kind: "valid"; line: number; trace: T }
   | {
       kind: "invalid";
       line: number;
       code: "invalid_json" | "invalid_trace" | "line_too_large";
     };
+export type RouteTraceReadResult = JsonlReadResult<RouteTrace>;
 export interface TraceReader {
   read(): AsyncIterable<RouteTraceReadResult>;
 }
@@ -96,12 +97,15 @@ export async function openPrivateFile(
 }
 
 /** Bounded line buffer and a byte-size snapshot: concurrent appends wait for the next read. */
-export class JsonlTraceReader implements TraceReader {
+export class PrivateJsonlReader<T> {
   constructor(
     private readonly path: string,
     private readonly protectedPaths: readonly string[],
+    private readonly schema: {
+      safeParse(raw: unknown): { success: true; data: T } | { success: false };
+    },
   ) {}
-  async *read(): AsyncIterable<RouteTraceReadResult> {
+  async *read(): AsyncIterable<JsonlReadResult<T>> {
     let file: FileHandle | undefined;
     try {
       await assertTraceDestination(this.path, this.protectedPaths);
@@ -121,9 +125,9 @@ export class JsonlTraceReader implements TraceReader {
           parts = [];
         } else if (!oversized) parts.push(Buffer.from(part));
       };
-      const finish = (): RouteTraceReadResult => {
+      const finish = (): JsonlReadResult<T> => {
         line++;
-        let result: RouteTraceReadResult;
+        let result: JsonlReadResult<T>;
         if (oversized)
           result = { kind: "invalid", line, code: "line_too_large" };
         else {
@@ -133,7 +137,7 @@ export class JsonlTraceReader implements TraceReader {
                 Buffer.concat(parts, length),
               ),
             );
-            const parsed = routeTraceSchema.safeParse(raw);
+            const parsed = this.schema.safeParse(raw);
             result = parsed.success
               ? { kind: "valid", line, trace: parsed.data }
               : { kind: "invalid", line, code: "invalid_trace" };
@@ -171,5 +175,14 @@ export class JsonlTraceReader implements TraceReader {
     } finally {
       await file?.close();
     }
+  }
+}
+
+export class JsonlTraceReader
+  extends PrivateJsonlReader<RouteTrace>
+  implements TraceReader
+{
+  constructor(path: string, protectedPaths: readonly string[]) {
+    super(path, protectedPaths, routeTraceSchema);
   }
 }

@@ -1,5 +1,7 @@
 import type { Readable } from "node:stream";
 import { Argument, Command, Option } from "commander";
+import { readHookJson } from "../hooks/stdin.js";
+import { observeClaudeSkill } from "../observability/claude-skill-hook.js";
 import { VERSION } from "../version.js";
 import { discoverCommand } from "./commands/discover.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -89,6 +91,18 @@ export function createProgram(
           : "Route Claude skills; user-owned mode controls advisory output",
       )
       .action(() => hookCommand(host, environment, stdin, io));
+  hook
+    .command("claude-skill")
+    .description(
+      "Observe a Claude native Skill tool event locally; always silent and fail-open",
+    )
+    .action(async () => {
+      try {
+        await observeClaudeSkill(await readHookJson(stdin), environment);
+      } catch {
+        /* fail open */
+      }
+    });
   program
     .command("doctor")
     .description("Check local routing readiness offline; no files changed")

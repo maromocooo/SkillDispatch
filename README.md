@@ -898,3 +898,10 @@ node scripts/trace-ops-smoke.mjs /path/to/install/node_modules/.bin/skilldispatc
 This explicit development script uses temporary settings and denies fetch; it is
 not run by normal tests, CI or prepack. No online doctor or raw-prompt display
 option exists. Advisory remains deferred.
+
+Claude native Skill observer (PR9): `skilldispatch hook claude-skill` accepts
+`PreToolUse`, `PostToolUse`, or `PostToolUseFailure` JSON for `tool_name: "Skill"`
+on stdin. It is local-only, silent, and fail-open. Events go to the private
+`invocations.jsonl` in the SkillDispatch data directory, separately from routing
+traces. Arguments, tool responses, errors, transcripts and raw host IDs are not
+persisted. Only exact native identifier matches resolve to catalog metadata.
