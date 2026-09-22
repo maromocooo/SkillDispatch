@@ -1,5 +1,6 @@
 import { compareText } from "../core/order.js";
 import type { AgentKind, Diagnostic, SkillDescriptor } from "../core/types.js";
+import { claudeMetadata, invocationIdentity } from "./claude-origin.js";
 import type { DiscoveryResult } from "./types.js";
 
 export function finalizeCatalog(
@@ -22,7 +23,10 @@ export function finalizeCatalog(
     { agent: AgentKind; name: string; skillIds: string[] }
   >();
   for (const skill of skills) {
-    const name = skill.name.replace(/\s+/gu, " ").trim();
+    const native = claudeMetadata(skill)?.nativeInvocationName;
+    const name = native
+      ? invocationIdentity(native)
+      : skill.name.replace(/\s+/gu, " ").trim();
     const key = JSON.stringify([skill.agent, name]);
     const group = names.get(key) ?? { agent: skill.agent, name, skillIds: [] };
     group.skillIds.push(skill.id);

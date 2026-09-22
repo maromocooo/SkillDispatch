@@ -1,4 +1,4 @@
-import { readdir, realpath, stat } from "node:fs/promises";
+import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { compareText } from "../core/order.js";
 import type { AgentKind } from "../core/types.js";
@@ -9,6 +9,7 @@ import type { DiscoveryResult, DiscoverySource } from "./types.js";
 
 interface ScanOptions {
   recursive?: boolean;
+  followSymlinks?: boolean;
   skipDirectory?: (name: string) => boolean;
   parserOptions?: (path: string) => Partial<ParseSkillContext>;
 }
@@ -30,6 +31,13 @@ export async function scanSources(
     async function walk(path: string, depth: number): Promise<void> {
       let canonical: string;
       try {
+        if (
+          options.followSymlinks === false &&
+          (await lstat(path)).isSymbolicLink()
+        ) {
+          warn("unsafe_claude_source", "Symlink source excluded.", path);
+          return;
+        }
         canonical = await realpath(path);
         if (!(await stat(canonical)).isDirectory()) return;
       } catch (error) {
@@ -59,6 +67,10 @@ export async function scanSources(
         ).sort((a, b) => compareText(a.name, b.name));
         const file = entries.find((entry) => entry.name === "SKILL.md");
         if (file) {
+          if (options.followSymlinks === false && file.isSymbolicLink()) {
+            warn("unsafe_claude_source", "Symlink skill file excluded.", path);
+            return;
+          }
           const skillPath = await realpath(join(canonical, "SKILL.md"));
           if (!seenFiles.has(skillPath)) {
             seenFiles.add(skillPath);

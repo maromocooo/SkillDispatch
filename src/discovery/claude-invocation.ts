@@ -1,5 +1,6 @@
 import { basename, dirname, resolve } from "node:path";
 import type { SkillDescriptor } from "../core/types.js";
+import { claudeMetadata, safeInvocationSegment } from "./claude-origin.js";
 
 export function parseClaudeBoolean(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
@@ -16,6 +17,16 @@ export function claudeInvocationName(
 ): string | undefined {
   if (skill.agent !== "claude-code" || !["repo", "user"].includes(skill.scope))
     return;
+  const claude = claudeMetadata(skill);
+  if (claude?.origin === "synced") {
+    const name = claude.nativeInvocationName;
+    const segment = name?.slice("anthropic-skills:".length);
+    return name?.startsWith("anthropic-skills:") &&
+      safeInvocationSegment(segment) &&
+      skill.metadata.commandName === name
+      ? name
+      : undefined;
+  }
   const discovery = skill.metadata.discovery;
   if (!discovery || typeof discovery !== "object") return;
   const { path, source } = discovery as Record<string, unknown>;

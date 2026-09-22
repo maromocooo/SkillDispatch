@@ -1,6 +1,8 @@
 import { basename, dirname, join } from "node:path";
 import { finalizeCatalog } from "./catalog.js";
 import { parseClaudeBoolean } from "./claude-invocation.js";
+import { safeInvocationSegment } from "./claude-origin.js";
+import { discoverSyncedSkills } from "./claude-synced.js";
 import { projectDirectories } from "./filesystem.js";
 import { scanSources } from "./scan.js";
 import type {
@@ -10,7 +12,7 @@ import type {
   DiscoverySource,
 } from "./types.js";
 
-/** Local personal/project skills only; plugin and session state require host APIs. */
+/** Read-only native catalog snapshot; host session state remains authoritative. */
 export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
   readonly agent = "claude-code";
 
@@ -35,6 +37,19 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       }),
     });
     for (const skill of result.skills) {
+      const discovery = skill.metadata.discovery as DiscoveryMetadata;
+      const name = basename(dirname(discovery.path));
+      skill.metadata.commandName = name;
+      skill.metadata.claude = {
+        origin: skill.scope === "user" ? "local-user" : "local-project",
+        modelInvocable: skill.enabled,
+        ...(safeInvocationSegment(name) ? { nativeInvocationName: name } : {}),
+      };
+    }
+    const synced = await discoverSyncedSkills(configHome);
+    result.skills.push(...synced.skills);
+    result.diagnostics.push(...synced.diagnostics);
+    for (const skill of result.skills) {
       const value = skill.metadata["disable-model-invocation"];
       const disabled = parseClaudeBoolean(value);
       if (value !== undefined && disabled === undefined) {
@@ -55,9 +70,8 @@ export class ClaudeDiscoveryAdapter implements DiscoveryAdapter {
       if (typeof whenToUse === "string" && whenToUse.trim()) {
         skill.description = `${skill.description} ${whenToUse.replace(/\s+/gu, " ").trim()}`;
       }
-      // Retain the command-name distinction: frontmatter name is only a display label.
-      const discovery = skill.metadata.discovery as DiscoveryMetadata;
-      skill.metadata.commandName = basename(dirname(discovery.path));
+      (skill.metadata.claude as { modelInvocable: boolean }).modelInvocable =
+        skill.enabled;
     }
     return finalizeCatalog([result]);
   }

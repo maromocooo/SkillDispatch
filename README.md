@@ -210,6 +210,15 @@ The generic/Codex parser still requires non-empty name and description. Claude
 fallbacks live in its adapter; a skill with no usable description is diagnosed
 and excluded. Claude `when_to_use` is appended to the routing description.
 
+Claude cached synced skills are now read explicitly from
+`<CLAUDE_CONFIG_DIR>/skills/synced/<sync-directory>/<skill>/SKILL.md`, separately
+from personal skills. Advisory uses `anthropic-skills:<skill>`; sync-directory
+names are not invocation identifiers. Duplicate names across sync directories are
+conservatively marked non-routable with `ambiguous_synced_skill`: there is no
+public local active-account selector, so SkillDispatch does not guess a winner.
+Identical duplicate versions collapse; differing content stays visible for review.
+This is an offline cache snapshot, not proof of current account/session availability.
+
 Boundaries and limitations:
 
 - Git repositories, worktrees and submodules use the nearest `.git` directory or
@@ -226,7 +235,7 @@ Boundaries and limitations:
 - Codex system roots are explicit library options because installation paths
   vary. Plugin caches and old repository `.codex/skills` are not guessed.
 - PR1 does not reproduce session state, repository trust, managed restrictions,
-  Claude `skillOverrides`, synced skills, plugins, legacy commands, `--add-dir`,
+  Claude `skillOverrides`, plugin state, legacy commands, `--add-dir`,
   or skills activated later by file access. It is a local catalog, not telemetry
   of which skills a host actually loaded or invoked.
 - Only Codex user TOML disable entries are read; project/managed config layering
