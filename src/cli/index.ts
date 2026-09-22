@@ -50,7 +50,6 @@ try {
     }
   }
 } finally {
-  if (hookDeadline !== undefined) clearTimeout(hookDeadline);
   // Storage has been awaited. Do not let a timed-out provider's remaining sockets
   // hold up the host; no AbortSignal is forwarded into the SDK's unsafe transport.
   if (hookInvocation) {
@@ -58,6 +57,7 @@ try {
     await new Promise<void>((resolve) =>
       process.stdout.write("", () => resolve()),
     );
+    if (hookDeadline !== undefined) clearTimeout(hookDeadline);
     process.exit(0);
   }
 }

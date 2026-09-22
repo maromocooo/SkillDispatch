@@ -131,10 +131,10 @@ try {
         ? invoke(handler.command, handler.args, payload)
         : invoke("/bin/sh", ["-c", handler.command], payload);
     assert.equal(output, "");
-    run(["hooks", "install", host, "--sync"]);
+    run(["hooks", "install", host, ...(host === "claude" ? ["--sync"] : [])]);
     assert.equal(
       JSON.parse(run(["hooks", "status", host, "--json"])).hosts[0].execution,
-      "sync",
+      host === "claude" ? "sync" : "async",
     );
     const sync = await readFile(path, "utf8");
     run(["hooks", "uninstall", host, "--dry-run"]);

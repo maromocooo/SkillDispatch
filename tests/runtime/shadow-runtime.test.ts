@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "tsup";
@@ -10,6 +10,10 @@ import { schemaValidator } from "../telemetry/helpers.js";
 let output: string;
 beforeAll(async () => {
   output = await mkdtemp(join(tmpdir(), "skilldispatch-shadow-runtime-"));
+  await writeFile(
+    join(output, "stall-stdout.mjs"),
+    "process.stdout.write = () => true;\n",
+  );
   await build({
     entry: {
       fixture: "tests/runtime/fixtures/shadow-child.ts",
@@ -39,13 +43,19 @@ afterAll(async () => {
   if (output) await rm(output, { recursive: true, force: true });
 });
 
-function child(entry: string, args: string[], input?: string) {
+function child(
+  entry: string,
+  args: string[],
+  input?: string,
+  nodeArgs: string[] = [],
+) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     (resolve, reject) => {
       const proc = spawn(
         process.execPath,
         [
           "--unhandled-rejections=strict",
+          ...nodeArgs,
           join(output, `${entry}.mjs`),
           ...args,
         ],
@@ -78,6 +88,14 @@ function child(entry: string, args: string[], input?: string) {
 }
 
 describe("shadow hooks in strict child processes", () => {
+  it("retains the process deadline while a hook stdout flush is stalled", async () => {
+    expect(
+      await child("cli", ["hook", "claude"], "{", [
+        "--import",
+        join(output, "stall-stdout.mjs"),
+      ]),
+    ).toEqual({ code: 0, stdout: "", stderr: "" });
+  });
   it.each(["codex", "claude"] as const)(
     "%s exits 0, writes a valid trace, and remains silent on missing credentials",
     async (host) => {
