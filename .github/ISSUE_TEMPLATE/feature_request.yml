@@ -1,0 +1,14 @@
+name: Feature request
+description: Explain a concrete use case and its constraints.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and desired behavior
+      description: Use synthetic examples; no private prompts or credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Alternatives, privacy and compatibility considerations

@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem without private data.
+body:
+  - type: markdown
+    attributes:
+      value: 'Do not include API keys, raw prompts, full host config, company data or raw JSONL. For vulnerabilities, follow SECURITY.md instead.'
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: SkillDispatch, Node, OS, host agent and host version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Synthetic reproduction and expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized doctor or trace CLI output
+      description: Review output first. Redact home paths, skill names and any sensitive identifiers. Do not paste full configs or raw trace files.
