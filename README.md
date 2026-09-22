@@ -200,7 +200,12 @@ Default files: `~/.local/share/skilldispatch/traces.jsonl` and `invocations.json
 `SKILLDISPATCH_DATA_DIR` / `XDG_DATA_HOME` can relocate storage. Summary reports
 latencies, failures, selected skill versions and observed adoption; “never selected”
 means seen in decisions but never selected, not every skill installed on your machine.
-All trace commands support `--json` and never print raw prompts or correlation keys.
+Trace text uses aligned tables on wide terminals and labeled cards when columns
+do not fit. Full trace IDs remain copyable, timestamps are UTC, and latency includes
+`ms`. `traces show` separates recommendations from observed native invocations;
+`traces summary` separates filtered routing results from whole-file stream health.
+Text is for people; use `--json` for scripts and integrations. All trace commands
+support it and never print raw prompts or correlation keys.
 [Detailed semantics](docs/OPERATIONS.md#claude-model-skill-invocation-telemetry).
 
 ## Routing evals and public benchmark

@@ -596,6 +596,60 @@ List keeps the newest 20 records by timestamp (UUID tie-break), with `--limit`
 without `--since`, future records are included. Show requires a full UUID and exits
 1 for missing or duplicate IDs. Corrupt lines are counted and skipped.
 
+### Reading the text output
+
+Text output is a human interface; use `--json` for machine-readable views. JSON
+does not contain table formatting and keeps ISO timestamps. Text shows UTC time,
+scores from 0 to 1 with four decimals, and latency in milliseconds with two
+decimals. A score is not a confidence or accuracy measurement.
+
+Tables share column widths across headers and rows, with numbers right aligned.
+If all columns do not fit, labeled cards retain every value, including the full
+UUID needed by `traces show`. Long names wrap at grapheme boundaries without
+ellipsis. On a terminal narrower than a UUID, the identifier stays unbroken in the
+output so it can still be copied; the terminal may visually wrap it.
+
+For example, this synthetic record uses the narrow list layout:
+
+```text
+Trace 00000000-0000-4000-8000-000000000001
+  Time (UTC): 2000-01-02 03:04:05.678
+  Agent     : claude-code
+  Outcome   : COMPLETE
+  Mode      : advisory
+  Selected  : 2
+  Latency   : 842.48 ms
+```
+
+`traces show` presents the overview, recommendation counts, skill decisions,
+observed model invocations and safe diagnostic codes/levels separately. A complete
+route with zero selections says `No skill recommendation selected.` Missing
+observer events say `No model skill invocation event observed.` These are different
+facts: neither says the catalog is empty or the agent could not use a skill.
+
+Summary starts with matching traces, then routing outcomes/latency, observed
+adoption, skill versions, and stream health. Whole-file line counts and invocation
+stream health are labeled separately from filtered routing results. Selection rate
+means recommendations per observed skill-version decision, not invocation
+conversion or accuracy.
+
+The CLI passes stdout TTY/width information to a renderer that does no input or
+cursor control. Valid TTY widths are 20–500 columns; unknown/invalid widths and
+redirected output use a deterministic 100-column layout. `COLUMNS` is not read.
+There are no colors or ANSI sequences, including with `NO_COLOR`; `TERM=dumb`
+uses plain cards without table rules or heading underlines. Untrusted control
+characters are escaped before Unicode display width is measured.
+
+To reproduce synthetic output in an actual POSIX PTY (Python 3 required for this
+test runner only), from a built checkout:
+
+```sh
+node scripts/trace-display-smoke.mjs dist/cli/index.js --pty --examples /tmp/skilldispatch-trace-display
+```
+
+This verifies 80/100/120/160 columns and JSON parity in an isolated home. Omitting
+`--pty` runs pipe checks only, which do not demonstrate actual TTY behavior.
+
 ## Offline installation health
 
 After adding the shadow hook commands from the setup examples above, run
