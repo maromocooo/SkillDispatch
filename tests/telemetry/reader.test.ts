@@ -12,6 +12,7 @@ import {
   JsonlTraceReader,
   MAX_TRACE_LINE_BYTES,
 } from "../../src/telemetry/reader.js";
+import { assertPrivate } from "../../src/telemetry/storage.js";
 import { workspace } from "../helpers.js";
 import { traceFixture } from "./helpers.js";
 
@@ -146,6 +147,26 @@ describe("safe streaming trace reader", () => {
         collect(new JsonlTraceReader(path, [secret])),
       ).rejects.toThrow();
     }
+  });
+  it("rejects foreign POSIX ownership with the shared storage guard", () => {
+    const uid = process.getuid?.();
+    if (process.platform !== "win32" && uid !== undefined) {
+      expect(() => assertPrivate({ mode: 0o600, uid: uid + 1 })).toThrow();
+    }
+  });
+  it("handles multibyte text across chunks and CRLF without losing data", async () => {
+    const { path, reader } = await setup();
+    const trace = traceFixture();
+    trace.prompt = { storage: "raw", raw: "日本語".repeat(15000) };
+    await writeFile(path, `${JSON.stringify(trace)}\r\n`, { mode: 0o600 });
+    expect(await collect(reader)).toEqual([{ kind: "valid", line: 1, trace }]);
+  });
+  it("rejects symlink loops promptly with a fixed error", async () => {
+    const { path, reader } = await setup();
+    await symlink(path, path);
+    await expect(collect(reader)).rejects.toThrow(
+      "Trace destination is unsafe or unreadable.",
+    );
   });
   it("uses a file size snapshot and closes an early-stopped iterator", async () => {
     const { path, reader } = await setup();
