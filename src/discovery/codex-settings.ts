@@ -103,6 +103,10 @@ export async function loadCodexSettings(
     bundled = true;
   for (const layer of layers) {
     const features = record.safeParse(layer.features);
+    if (layer.features !== undefined && !features.success) {
+      pluginsValid = false;
+      codexDiagnostic(diagnostics, "invalid_codex_plugin_policy");
+    }
     if (features.success && features.data.plugins !== undefined) {
       if (typeof features.data.plugins === "boolean")
         pluginsEnabled = features.data.plugins;
@@ -129,12 +133,18 @@ export async function loadCodexSettings(
     }
     if (layer.plugins !== undefined) {
       const parsed = z
-        .record(z.string(), z.object({ enabled: z.boolean().default(true) }))
+        .record(z.string(), z.object({ enabled: z.boolean().optional() }))
         .safeParse(layer.plugins);
       if (!parsed.success) {
         pluginsValid = false;
         codexDiagnostic(diagnostics, "invalid_codex_plugin_config");
-      } else Object.assign(plugins, parsed.data);
+      } else {
+        for (const [identity, entry] of Object.entries(parsed.data)) {
+          plugins[identity] = {
+            enabled: entry.enabled ?? plugins[identity]?.enabled ?? true,
+          };
+        }
+      }
     }
   }
   // Upstream enable/disable selectors use User + SessionFlags only, not project layers.

@@ -70,21 +70,27 @@ export async function discoverCodexPlugins(
         continue;
       }
       const portablePath = join(root, "plugin.json");
-      const portable = await readOptional(portablePath, result.diagnostics);
-      const manifestPath =
-        portable === undefined
-          ? join(root, ".codex-plugin/plugin.json")
-          : portablePath;
+      let portable = false;
+      try {
+        await lstat(portablePath);
+        portable = true;
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+      }
+      const manifestPath = portable
+        ? portablePath
+        : join(root, ".codex-plugin/plugin.json");
+      const info = await lstat(manifestPath);
       if (
-        (await lstat(manifestPath)).isSymbolicLink() ||
+        !info.isFile() ||
+        info.isSymbolicLink() ||
         !contained(root, await realpath(manifestPath))
       )
         throw new Error();
-      const text =
-        portable ?? (await readOptional(manifestPath, result.diagnostics));
+      const text = await readOptional(manifestPath, result.diagnostics);
       const raw: unknown = JSON.parse(text ?? "");
       const manifest = manifestSchema.parse(raw);
-      if (portable !== undefined) {
+      if (portable) {
         const doc = z
           .object({
             $schema: z.literal(
@@ -130,7 +136,7 @@ export async function discoverCodexPlugins(
           continue;
         }
         const found = await scanSources("codex", [{ path, scope: "user" }], {
-          recursive: portable === undefined,
+          recursive: !portable,
           followSymlinks: false,
           rootSkill: false,
           ...(targetPath ? { targetPath } : {}),

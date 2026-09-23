@@ -299,3 +299,58 @@ it("applies file-managed marketplace restrictions conservatively without losing 
   expect(r.skills.some((s) => s.name === "foo:review")).toBe(false);
   expect(r.skills.find((s) => s.name === "user-skill")?.enabled).toBe(true);
 });
+
+it.each(["directory", "symlink", "malformed"])(
+  "does not fall back past an invalid portable manifest: %s",
+  async (kind) => {
+    const c = await fixture();
+    const path = join(c.pluginRoot, "plugin.json");
+    if (kind === "directory") await mkdir(path);
+    else if (kind === "symlink")
+      await symlink(join(c.pluginRoot, ".codex-plugin/plugin.json"), path);
+    else await write(path, "{");
+    const result = await adapter().discover(c);
+    expect(
+      result.skills.some((s) => codexMetadata(s)?.origin === "plugin"),
+    ).toBe(false);
+    expect(result.skills.find((s) => s.name === "user-skill")?.enabled).toBe(
+      true,
+    );
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  },
+);
+it("preserves lower plugin false when a trusted higher entry omits enabled", async () => {
+  const c = await fixture();
+  await write(
+    join(c.codex, "config.toml"),
+    `[projects.${JSON.stringify(c.repo)}]\ntrust_level="trusted"\n[plugins."foo@market"]\nenabled=false`,
+  );
+  const path = join(c.repo, ".codex/config.toml");
+  await write(path, '[plugins."foo@market"]');
+  expect(
+    (await adapter().discover(c)).skills.some((s) => s.name === "foo:review"),
+  ).toBe(false);
+  await write(path, '[plugins."foo@market"]\nenabled=true');
+  expect(
+    (await adapter().discover(c)).skills.find((s) => s.name === "foo:review")
+      ?.enabled,
+  ).toBe(true);
+});
+it("excludes plugins when the authoritative features table is malformed", async () => {
+  const c = await fixture();
+  await write(
+    join(c.codex, "config.toml"),
+    'features="PRIVATE_INVALID"\n[plugins."foo@market"]\nenabled=true',
+  );
+  const result = await adapter().discover(c);
+  expect(result.skills.some((s) => codexMetadata(s)?.origin === "plugin")).toBe(
+    false,
+  );
+  expect(result.skills.find((s) => s.name === "user-skill")?.enabled).toBe(
+    true,
+  );
+  expect(
+    result.diagnostics.some((d) => d.code === "invalid_codex_plugin_policy"),
+  ).toBe(true);
+  expect(JSON.stringify(result.diagnostics)).not.toContain("PRIVATE_INVALID");
+});
