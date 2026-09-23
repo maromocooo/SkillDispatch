@@ -13,6 +13,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const cli = resolve(process.argv[2]);
+const contract = process.argv[3] ?? "0.155.1";
+assert.ok(
+  ["0.155.1", "0.156.1"].includes(contract),
+  "Verified CLI fixture contract required",
+);
 const root = await mkdtemp(join(tmpdir(), "skilldispatch-codex-smoke-"));
 let stage = "setup";
 try {
@@ -70,7 +75,7 @@ try {
   const configure = (mode) =>
     write(
       userConfig,
-      `hook:\n  codexContract: "0.155.1"\n  modes: {codex: ${mode}}\nrouter: {provider: mock, mock: {defaultProbability: 0.95}}\n`,
+      `hook:\n  codexContract: "${contract}"\n  modes: {codex: ${mode}}\nrouter: {provider: mock, mock: {defaultProbability: 0.95}}\n`,
     );
   await configure("shadow");
   const preload = join(root, "isolate.mjs");
@@ -227,7 +232,7 @@ try {
   assert.equal(await readFile(claude, "utf8"), '{"fixture":"untouched"}');
   await assert.rejects(access(join(root, "network-attempt")));
   console.log(
-    `PASS ${process.version}: installed Codex catalog/shadow/advisory/read-evidence/correlation/JSON/text/rollback; synthetic fixtures only; no model API`,
+    `PASS ${process.version}: installed Codex ${contract} catalog/shadow/advisory/read-evidence/correlation/JSON/text/rollback; synthetic fixtures only; no model API`,
   );
 } catch (error) {
   console.error(

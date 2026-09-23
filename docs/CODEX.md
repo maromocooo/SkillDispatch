@@ -6,11 +6,18 @@ that the model followed its instructions, or that its task succeeded.
 
 ## Verified host contracts
 
-The reference CLI is Codex **0.155.1**, upstream commit
-[`be2951ea34f0d295ed0becf97079f92fa5f6950e`](https://github.com/openai/codex/tree/be2951ea34f0d295ed0becf97079f92fa5f6950e).
+The source-verified CLI contracts are exact versions **0.155.1** and **0.156.1**.
+Their relevant interfaces were compared on **2026-09-23**:
+
+| CLI version | Pinned upstream commit |
+|---|---|
+| 0.155.1 | [`be2951ea34f0d295ed0becf97079f92fa5f6950e`](https://github.com/openai/codex/tree/be2951ea34f0d295ed0becf97079f92fa5f6950e) |
+| 0.156.1 | [`b412ff32c417f855c2b2d1581b77058eed87c84b`](https://github.com/openai/codex/tree/b412ff32c417f855c2b2d1581b77058eed87c84b) |
+
 The inspected Desktop application **26.915.31945** embeds **0.155.0-alpha.9.2**,
 commit [`4607249e430dac1c961df4dc615beae88e33cec8`](https://github.com/openai/codex/tree/4607249e430dac1c961df4dc615beae88e33cec8).
-These versions share the relevant hook schema and plugin store selection code.
+The Desktop contract is verified separately; CLI verification does not certify a newer Desktop build.
+These exact contracts share the relevant hook schema and plugin store selection code.
 Source verification and fixture tests are separate from real-session validation.
 
 | Surface | Verified contract | Boundary |
@@ -21,7 +28,7 @@ Source verification and fixture tests are separate from real-session validation.
 | Terminal state | Unified exec Post response is output text, possibly truncated | Post is not exit-code evidence; success and complete load remain unknown |
 | Correlation | `session_id`, `turn_id`, `tool_use_id`; optional `agent_id` | Subagents share parent session identity; never credit their events to main-turn adoption |
 
-Relevant sources at the CLI commit:
+Relevant sources at the 0.155.1 CLI commit:
 [hook wire schemas](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/hooks/src/schema.rs),
 [developer context placement](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/core/src/context/hook_additional_context.rs),
 [tool response projection](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/core/src/tools/context.rs),
@@ -29,6 +36,45 @@ Relevant sources at the CLI commit:
 [skill configuration rules](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/config/src/skills_config.rs),
 [plugin installation selection](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/core-plugins/src/store.rs),
 [plugin namespaces](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/ext/skills/src/loader/namespace.rs).
+
+### CLI 0.155.1 to 0.156.1 comparison
+
+The hook engine source, including wire schemas, user/plugin hook discovery, trust,
+matchers and sync/async dispatch, is unchanged between the pinned commits.
+`UserPromptSubmit` still awaits synchronous hooks and records
+`hookSpecificOutput.additionalContext` as developer context after the original
+user input in the same turn. Async delivery is not a substitute for this path.
+
+`exec_command` still projects to the **Bash** hook matcher with
+`tool_input.command`. The legacy model `shell_type: "shell_command"` is an alias
+for unified exec in both versions, not an additional observer matcher. Session,
+turn and tool-use IDs retain their meaning.
+Unified exec may complete through `write_stdin`, retaining the original call ID.
+A running command has no terminal Post yet. A nonzero command exit can emit Post:
+its response is output text, not a structured exit/success result. Instruction-read
+terminal outcomes therefore remain **unknown**. Model/permission fields now use
+step context in some tool hooks; SkillDispatch does not consume these fields for
+read evidence or correlation.
+
+Local skill roots, scoped skill configuration and plugin cache selection are
+unchanged. Upstream discovery has internal filesystem-access refactoring and adds
+onboarding-skill metadata and remote-installed plugin handling. These do not expand
+SkillDispatch's supported disk-state model: unresolved extensions, remote account
+state and live-session catalog availability remain outside its verified coverage.
+No dedicated native Skill-call event was added to the contract used here.
+
+Relevant 0.156.1 sources:
+[hook schema](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/hooks/src/schema.rs),
+[hook runtime](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core/src/hook_runtime.rs),
+[user input and context recording](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core/src/codex.rs),
+[tool response projection](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core/src/tools/context.rs),
+[tool dispatch](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core/src/tools/registry.rs),
+[skill roots](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/ext/skills/src/host_roots.rs),
+[skill configuration](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/config/src/skills_config.rs),
+[plugin store](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core-plugins/src/store.rs).
+
+This is source/fixture verification, not a claim that live CLI dogfood has passed.
+Unverified versions such as 0.157.x fail open without advisory or observer readiness.
 
 See also the official [hooks](https://learn.chatgpt.com/docs/hooks),
 [skills](https://learn.chatgpt.com/docs/build-skills),
@@ -98,12 +144,12 @@ profile's user** SkillDispatch config:
 
 ```yaml
 hook:
-  codexContract: "0.155.1"
+  codexContract: "0.156.1"
   modes:
     codex: advisory
 ```
 
-Use `0.155.0-alpha.9.2` only when that is the verified target runtime, such as the
+Use `0.155.1` for that exact CLI, or `0.155.0-alpha.9.2` only when that is the verified target runtime, such as the
 Desktop build listed above. This value declares a source-verified target; it is not
 a runtime attestation. Check the actual CLI/embedded binary after host upgrades.
 Unknown/absent contracts cannot emit Codex advisory or enable its observer readiness.

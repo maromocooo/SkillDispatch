@@ -1,4 +1,5 @@
 import {
+  access,
   chmod,
   link,
   readFile,
@@ -247,42 +248,65 @@ describe("narrow Codex instruction-read evidence", () => {
     expect(summary.result()).not.toHaveProperty("notInvoked");
     expect(summary.result()).not.toHaveProperty("conversion");
   });
-  it("uses exact-file discovery and works without API credentials; unrelated tools do no discovery", async () => {
-    const c = await workspace(),
-      env = { ...c, env: { SKILLDISPATCH_DATA_DIR: join(c.root, "data") } };
+  it.each(["0.155.1", "0.156.1"])(
+    "uses %s exact-file discovery without API credentials; unrelated tools do no discovery",
+    async (contract) => {
+      const c = await workspace(),
+        env = { ...c, env: { SKILLDISPATCH_DATA_DIR: join(c.root, "data") } };
+      await write(
+        join(c.home, ".config/skilldispatch/config.yaml"),
+        `hook: {codexContract: "${contract}"}`,
+      );
+      const target = join(c.repo, ".agents/skills/react/SKILL.md");
+      const discover = vi.fn(
+        (
+          context: import("../../src/runtime/context.js").RuntimeEnvironment,
+          path: string,
+        ) =>
+          new CodexDiscoveryAdapter({
+            adminRoots: [],
+            targetPath: path,
+          }).discover(context),
+      );
+      await observeCodexRead(
+        { ...raw(), cwd: c.cwd, tool_input: { command: "echo safe" } },
+        env,
+        { discover },
+      );
+      expect(discover).not.toHaveBeenCalled();
+      await observeCodexRead(
+        { ...raw(), cwd: c.cwd, tool_input: { command: `cat '${target}'` } },
+        env,
+        { discover },
+      );
+      expect(discover).toHaveBeenCalledTimes(1);
+      const data = await readFile(codexReadPath(env), "utf8");
+      expect(data).not.toContain(c.root);
+      expect(data).not.toMatch(/PRIVATE_|SKILL.md/);
+      expect(JSON.parse(data).skill.resolved).toBe(true);
+      const found = await discover(env, target);
+      expect(found.skills).toHaveLength(1);
+    },
+  );
+  it("leaves unsupported contracts silent without discovery, storage or installation key", async () => {
+    const c = await workspace();
+    const data = join(c.root, "unsupported-data");
     await write(
       join(c.home, ".config/skilldispatch/config.yaml"),
-      'hook: {codexContract: "0.155.1"}',
+      'hook: {codexContract: "0.157.0"}',
     );
-    const target = join(c.repo, ".agents/skills/react/SKILL.md");
-    const discover = vi.fn(
-      (
-        context: import("../../src/runtime/context.js").RuntimeEnvironment,
-        path: string,
-      ) =>
-        new CodexDiscoveryAdapter({
-          adminRoots: [],
-          targetPath: path,
-        }).discover(context),
-    );
-    await observeCodexRead(
-      { ...raw(), cwd: c.cwd, tool_input: { command: "echo safe" } },
-      env,
-      { discover },
-    );
+    const discover = vi.fn(async () => ({ skills: [candidate()] }));
+    const persist = vi.fn(async () => {});
+    await expect(
+      observeCodexRead(
+        raw(),
+        { ...c, env: { SKILLDISPATCH_DATA_DIR: data } },
+        { discover, write: persist },
+      ),
+    ).resolves.toBeUndefined();
     expect(discover).not.toHaveBeenCalled();
-    await observeCodexRead(
-      { ...raw(), cwd: c.cwd, tool_input: { command: `cat '${target}'` } },
-      env,
-      { discover },
-    );
-    expect(discover).toHaveBeenCalledTimes(1);
-    const data = await readFile(codexReadPath(env), "utf8");
-    expect(data).not.toContain(c.root);
-    expect(data).not.toMatch(/PRIVATE_|SKILL.md/);
-    expect(JSON.parse(data).skill.resolved).toBe(true);
-    const found = await discover(env, target);
-    expect(found.skills).toHaveLength(1);
+    expect(persist).not.toHaveBeenCalled();
+    await expect(access(data)).rejects.toMatchObject({ code: "ENOENT" });
   });
   it("matches the strict published read schema and retains both old and new route contracts", async () => {
     const shipped = JSON.parse(

@@ -46,14 +46,17 @@ try {
     "claude-invocation-smoke",
     "trace-display-smoke",
     "codex-parity-smoke",
+    "codex-parity-smoke@0.156.1",
     "profile-isolation-smoke",
   ]) {
     stage = script;
+    const [scriptName, contract] = script.split("@");
     const run = spawnSync(
       process.execPath,
       [
-        fileURLToPath(new URL(`./${script}.mjs`, import.meta.url)),
+        fileURLToPath(new URL(`./${scriptName}.mjs`, import.meta.url)),
         cli,
+        ...(contract ? [contract] : []),
         ...(script === "trace-display-smoke" && process.argv.includes("--pty")
           ? ["--pty"]
           : []),

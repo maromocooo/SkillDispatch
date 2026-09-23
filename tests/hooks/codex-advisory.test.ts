@@ -82,62 +82,65 @@ describe("Codex user-owned advisory", () => {
       }),
     ).toBeUndefined();
   });
-  it("reconciles opt-in sync and shadow async in custom CODEX_HOME, detects mismatch, preserves unrelated handlers", async () => {
-    const c = await workspace(),
-      codex = join(c.root, "custom");
-    const env = { ...c, env: { CODEX_HOME: codex } };
-    const execution = {
-      nodePath: process.execPath,
-      cliPath: join(c.root, "cli.js"),
-      platform: process.platform,
-    };
-    await write(execution.cliPath, "// fixture");
-    const config = join(c.home, ".config/skilldispatch/config.yaml");
-    await write(
-      config,
-      'hook: {codexContract: "0.155.1", modes: {codex: shadow}}',
-    );
-    const path = join(codex, "hooks.json");
-    await write(
-      path,
-      JSON.stringify({
-        hooks: {
-          UserPromptSubmit: [
-            { hooks: [{ type: "command", command: "unrelated" }] },
-          ],
-        },
-      }),
-    );
-    await manageRegistration("codex", "install", env, execution);
-    await write(
-      config,
-      'hook: {codexContract: "0.155.1", modes: {codex: advisory}}',
-    );
-    expect(
-      (await inspectRegistration("codex", env, execution)).issues,
-    ).toContain("hook_execution_mismatch");
-    await manageRegistration("codex", "install", env, execution);
-    expect(await inspectRegistration("codex", env, execution)).toMatchObject({
-      mode: "advisory",
-      execution: "sync",
-      instructionObservers: { ready: true },
-    });
-    expect(
-      (await manageRegistration("codex", "install", env, execution)).changed,
-    ).toBe(false);
-    await write(
-      config,
-      'hook: {codexContract: "0.155.1", modes: {codex: shadow}}',
-    );
-    await manageRegistration("codex", "install", env, execution);
-    expect((await inspectRegistration("codex", env, execution)).execution).toBe(
-      "async",
-    );
-    await manageRegistration("codex", "uninstall", env, execution);
-    expect(
-      JSON.parse(await readFile(path, "utf8")).hooks.UserPromptSubmit,
-    ).toEqual([{ hooks: [{ type: "command", command: "unrelated" }] }]);
-  });
+  it.each(["0.155.1", "0.156.1"])(
+    "reconciles %s opt-in sync and shadow async in custom CODEX_HOME, detects mismatch, preserves unrelated handlers",
+    async (contract) => {
+      const c = await workspace(),
+        codex = join(c.root, "custom");
+      const env = { ...c, env: { CODEX_HOME: codex } };
+      const execution = {
+        nodePath: process.execPath,
+        cliPath: join(c.root, "cli.js"),
+        platform: process.platform,
+      };
+      await write(execution.cliPath, "// fixture");
+      const config = join(c.home, ".config/skilldispatch/config.yaml");
+      await write(
+        config,
+        `hook: {codexContract: "${contract}", modes: {codex: shadow}}`,
+      );
+      const path = join(codex, "hooks.json");
+      await write(
+        path,
+        JSON.stringify({
+          hooks: {
+            UserPromptSubmit: [
+              { hooks: [{ type: "command", command: "unrelated" }] },
+            ],
+          },
+        }),
+      );
+      await manageRegistration("codex", "install", env, execution);
+      await write(
+        config,
+        `hook: {codexContract: "${contract}", modes: {codex: advisory}}`,
+      );
+      expect(
+        (await inspectRegistration("codex", env, execution)).issues,
+      ).toContain("hook_execution_mismatch");
+      await manageRegistration("codex", "install", env, execution);
+      expect(await inspectRegistration("codex", env, execution)).toMatchObject({
+        mode: "advisory",
+        execution: "sync",
+        instructionObservers: { ready: true },
+      });
+      expect(
+        (await manageRegistration("codex", "install", env, execution)).changed,
+      ).toBe(false);
+      await write(
+        config,
+        `hook: {codexContract: "${contract}", modes: {codex: shadow}}`,
+      );
+      await manageRegistration("codex", "install", env, execution);
+      expect(
+        (await inspectRegistration("codex", env, execution)).execution,
+      ).toBe("async");
+      await manageRegistration("codex", "uninstall", env, execution);
+      expect(
+        JSON.parse(await readFile(path, "utf8")).hooks.UserPromptSubmit,
+      ).toEqual([{ hooks: [{ type: "command", command: "unrelated" }] }]);
+    },
+  );
   it("emits only with supported contract, explicit opt-in, complete routing and synchronous readiness", async () => {
     const c = await workspace();
     const input = {
@@ -153,6 +156,11 @@ describe("Codex user-owned advisory", () => {
       ["0.155.1", "advisory", true, 0.9, true],
       ["0.155.1", "advisory", false, 0.9, false],
       ["unknown", "advisory", true, 0.9, false],
+      ["0.157.0", "advisory", true, 0.9, false],
+      ["0.156.1", "advisory", true, 0.9, true],
+      ["0.156.1", "advisory", false, 0.9, false],
+      ["0.156.1", "shadow", true, 0.9, false],
+      ["0.156.1", "advisory", true, 0, false],
       ["0.155.1", "shadow", true, 0.9, false],
       ["0.155.1", "advisory", true, 0, false],
     ] as const) {
