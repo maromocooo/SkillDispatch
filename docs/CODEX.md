@@ -92,7 +92,9 @@ outside this disk-state model. Windows admin roots require explicit library opti
 
 ## Opt-in and rollback
 
-Both hosts default to shadow. In your **user** SkillDispatch config, merge:
+Both hosts default to shadow. Read [upgrade isolation](#upgrade-isolation) before
+using a candidate alongside 0.1.0. Initially, merge this only into the **isolated
+profile's user** SkillDispatch config:
 
 ```yaml
 hook:
@@ -138,7 +140,55 @@ skilldispatch hooks uninstall codex --dry-run
 skilldispatch hooks uninstall codex
 ```
 
-Other registrations and existing telemetry files remain intact.
+Other registrations and existing telemetry files remain intact. For isolated testing,
+run rollback/uninstall through the same profile wrapper. Stop that profile to return
+to your untouched stable environment; do not share its advisory config with 0.1.0.
+
+## Upgrade isolation
+
+**A separate package prefix does not isolate host integration.** Ownership checks
+match the registered command/args exactly. A hook from another checkout can be
+unrecognized, especially if its command contains no `skilldispatch` product name.
+Installing a candidate into the same host config may leave that hook and add another
+routing hook. The installer cannot automatically migrate every prior installation;
+it must not guess ownership or remove unknown registrations.
+
+New CLI backward reading support does not make new configuration forward-compatible
+with old CLIs. Version 0.1.0 accepts only `hook.modes.codex: shadow`. Sharing a user
+config containing `codex: advisory` can make **both old Codex and old Claude hooks**
+fail configuration validation. Separating `SKILLDISPATCH_DATA_DIR` alone leaves
+user config and host registrations shared. Old CLIs can also reject new Codex v2
+route records.
+
+Use an independent environment profile for the first real-host test, with all of:
+
+- A candidate package prefix and a fresh synthetic Git repository.
+- A private `HOME`; SkillDispatch user config resolves to
+  `$HOME/.config/skilldispatch/config.yaml`.
+- A private `CODEX_HOME` for host config, hooks and new login state.
+- A private `SKILLDISPATCH_DATA_DIR` for traces, observations and installation key.
+
+This means a separate environment, not just Codex's `--profile` option. Use 0700
+new directories and 0600 settings. Verify Node's actual `os.homedir()`, candidate
+`doctor`, hook status, the actual install dry-run target and runtime output destinations before installing
+anything. Hook status currently uses a generic default-root config label; it is not
+proof of the absolute CODEX_HOME destination. Check the dry-run target and actual
+file location. If HOME override does not resolve there, stop. No homedir monkey-patch
+should be needed for real-host preparation.
+
+Use one wrapper for the candidate and Codex that fixes those roots, absolute
+executables and synthetic cwd. Do not source the user's shell rc, inherit Node
+preloads or copy credential files. Keep the TypeSafe key in the launching shell;
+report only set/missing. Use file-backed Codex authentication in the isolated
+CODEX_HOME, subject to host policy, and let the user perform a separate login/trust
+review. See [official authentication](https://learn.chatgpt.com/docs/auth).
+Never copy existing auth.json or Keychain credentials.
+
+Switching a real user environment is a **separate explicit migration**: inventory
+old CLI paths, hook definitions, shared settings and data readers first. Keep the
+old settings compatible until all affected consumers are deliberately migrated.
+There is no automatic safe coexistence claim.
+
 
 ## Evidence and limits
 
@@ -209,18 +259,40 @@ available; report missing/extra/disabled/ambiguous sources. Do not start a separ
 app-server and call its catalog identical to the Desktop's. Such startup may refresh
 plugins or authenticated state, so it is a separate manual check.
 
-After explicit opt-in/install/trust, use a new host session and an isolated synthetic
-repository with one harmless skill that instructs the agent to summarize a fixed
-text. Keep real user files and external services outside the task. Try a matching
-prompt and an unrelated negative prompt; confirm zero recommendations are valid.
-Check that Codex performs the original task rather than only acknowledging context.
-Then inspect exact trace IDs:
+After checking isolation, install only into the dedicated CODEX_HOME and let the
+user launch **CLI** Codex separately after login and trust review. CLI success does
+not establish Desktop success. Use one harmless project skill with a distinctive
+output convention that appears only in its body, so a generic summary alone does
+not count as following that convention.
+
+Keep these tests separate:
+
+1. **Natural use:** request the synthetic task in ordinary language, without a skill
+   name, file path or read command. Check recommendation, emitted context and task
+   continuation. If Codex naturally uses `sed` or another unsupported reader, record
+   it as unobserved by this limited observer. Do not force `cat` afterward and call
+   that natural-use success. Include an unrelated negative prompt.
+2. **Observer wiring:** only if needed, explicitly request one literal absolute
+   `cat` of the synthetic SKILL.md. This tests real Bash Pre/Post delivery, storage
+   and correlation, not advisory-induced adoption, natural use, native invocation,
+   full load or execution success.
+3. **Plumbing fixtures:** feeding synthetic JSON directly to hook entrypoints tests
+   software wiring only. It does not prove that Codex emitted those events.
+
+View all records through the same isolated wrapper:
 
 ```sh
 skilldispatch traces list --agent codex --limit 3
 skilldispatch traces show <exact-trace-uuid>
 skilldispatch traces summary --agent codex
 ```
+
+Existing-user catalog comparison is a separate read-only task. Cache entries missing
+from the locally resolved catalog are not automatically inactive. Classify differences
+as live-host unavailable, Desktop-only, unconfirmed local settings, ambiguous version,
+policy exclusion, unsupported adapter source or unknown only when evidence permits.
+Do not start another app-server or trigger authentication/sync to infer the current
+session's catalog automatically.
 
 Check selected vs emitted, observer configuration, read-attempt vs terminal evidence,
 content correlation and unknown outcomes separately. Native invocation is unsupported

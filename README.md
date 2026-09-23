@@ -163,6 +163,8 @@ Changing configuration alone does not silently mutate host registrations.
 
 Codex advisory and read observers require a user-declared, source-verified target
 contract. See [Codex setup and limitations](docs/CODEX.md#opt-in-and-rollback).
+Start with an [isolated profile](docs/CODEX.md#upgrade-isolation): a candidate prefix
+alone does not isolate hooks or make new config compatible with 0.1.0.
 Codex inline `[hooks]` conflicts are refused instead of
 rewriting `config.toml`; see the [manual setup alternative](docs/OPERATIONS.md#manual-alternative-and-codex-inline-conflict).
 
