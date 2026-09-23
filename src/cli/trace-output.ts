@@ -106,44 +106,79 @@ export function renderTraceDetail(
     ]),
   );
 
-  out.section("Model skill invocations observed:");
-  const inv = result.modelInvocations;
-  out.facts([
-    [
-      "Invocation observer",
-      inv
-        ? inv.observerConfigured
-          ? "configured / best-effort"
-          : "not configured / telemetry unavailable"
-        : "unavailable",
-    ],
-  ]);
-  out.facts([
-    ["Invocation stream", inv?.streamReadable ? "readable" : "unavailable"],
-    ["Correlation", inv?.correlationAvailable ? "possible" : "unavailable"],
-  ]);
-  if (!inv?.calls.length) out.text("No model skill invocation event observed.");
-  else
+  if (result.instructionReads) {
+    const reads = result.instructionReads;
+    out.section("Codex instruction-read evidence");
+    out.facts([
+      [
+        "Observer",
+        reads.observerConfigured ? "configured / best-effort" : "unavailable",
+      ],
+      ["Stream", reads.streamReadable ? "readable" : "unavailable"],
+      ["Correlation", reads.correlationAvailable ? "possible" : "unavailable"],
+    ]);
+    if (!reads.calls.length)
+      out.text("No skill instruction-read event observed.");
     out.table(
       [
         { label: "Skill" },
-        { label: "Attempt observed" },
-        { label: "Terminal outcome" },
+        { label: "Read attempt" },
+        { label: "Terminal event" },
+        { label: "Outcome" },
         { label: "Context" },
-        { label: "Resolution" },
       ],
-      inv.calls.map((call) => [
-        call.nativeInvocationName,
-        yes(call.attempted),
-        call.diagnosticCode
-          ? `${call.outcome} (${call.diagnosticCode})`
-          : call.outcome,
-        call.executionContext,
-        call.resolved ? "resolved" : "unresolved",
+      reads.calls.map((c) => [
+        c.name,
+        yes(c.attemptObserved),
+        c.terminalWithoutAttempt ? "without attempt" : yes(c.terminalObserved),
+        c.outcome,
+        c.executionContext,
       ]),
     );
-  out.text("Missing events do not prove non-invocation or failure.");
-
+    out.text(
+      "Read requests are not native invocation or proof of loading. Terminal success and task quality are unknown.",
+    );
+  }
+  if (t.agent === "claude-code") {
+    out.section("Model skill invocations observed:");
+    const inv = result.modelInvocations;
+    out.facts([
+      [
+        "Invocation observer",
+        inv
+          ? inv.observerConfigured
+            ? "configured / best-effort"
+            : "not configured / telemetry unavailable"
+          : "unavailable",
+      ],
+    ]);
+    out.facts([
+      ["Invocation stream", inv?.streamReadable ? "readable" : "unavailable"],
+      ["Correlation", inv?.correlationAvailable ? "possible" : "unavailable"],
+    ]);
+    if (!inv?.calls.length)
+      out.text("No model skill invocation event observed.");
+    else
+      out.table(
+        [
+          { label: "Skill" },
+          { label: "Attempt observed" },
+          { label: "Terminal outcome" },
+          { label: "Context" },
+          { label: "Resolution" },
+        ],
+        inv.calls.map((call) => [
+          call.nativeInvocationName,
+          yes(call.attempted),
+          call.diagnosticCode
+            ? `${call.outcome} (${call.diagnosticCode})`
+            : call.outcome,
+          call.executionContext,
+          call.resolved ? "resolved" : "unresolved",
+        ]),
+      );
+    out.text("Missing events do not prove non-invocation or failure.");
+  }
   if (!t.diagnostics.length) {
     out.section("Diagnostics: none");
   } else {
@@ -230,6 +265,23 @@ export function renderTraceSummary(
     ]);
   }
 
+  if (s.instructionReads) {
+    const r = s.instructionReads;
+    out.section("Codex instruction-read evidence (matching route-skill pairs)");
+    out.facts([
+      ["Recommended", r.recommended],
+      ["Emitted", r.emitted],
+      ["Observed read attempts", r.observedInstructionReadAttemptPairs],
+      ["Observed terminal events", r.observedTerminalEventPairs],
+    ]);
+    out.facts([
+      ["Observer-configured traces", r.observerConfiguredTraces],
+      ["Observer-unavailable traces", r.observerUnavailableTraces],
+    ]);
+    out.text(
+      "No native invocation inferred. Terminal success and complete loading are unconfirmed; missing events remain unknown.",
+    );
+  }
   out.section("Skill versions (matching trace decisions)");
   out.facts([
     ["Skills seen", s.skillsSeen],
@@ -285,5 +337,21 @@ export function renderTraceSummary(
     "Async observers provide positive evidence only; missing events remain unknown.",
   );
   out.text("Exact conversion percentages are not reported.");
+  if (s.instructionReadHealth) {
+    const h = s.instructionReadHealth;
+    out.section("Codex instruction stream health (whole file)");
+    out.facts([
+      ["Valid events", h.validEvents],
+      ["Invalid lines", h.invalidLines],
+      ["Unsupported versions", h.unsupportedVersions],
+      ["Duplicates", h.duplicates],
+      ["Attempted only", h.attemptedOnly],
+      ["Terminal without attempt", h.terminalWithoutAttempt],
+      ["Unresolved", h.unresolved],
+      ["Conflicting", h.conflicting],
+    ]);
+  }
+  if (s.unsupportedVersions)
+    out.facts([["Unsupported route versions", s.unsupportedVersions]]);
   return out.finish();
 }

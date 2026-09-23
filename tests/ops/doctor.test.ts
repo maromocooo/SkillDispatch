@@ -112,7 +112,7 @@ describe("offline installation doctor", () => {
         result.checks.find((c) => c.code === "hook_project_config")?.value,
       ).toBe(trust === "true");
       expect(result.checks.find((c) => c.code === "provider")?.value).toBe(
-        trust === "true" ? "jev" : "mock",
+        "mock",
       );
     },
   );

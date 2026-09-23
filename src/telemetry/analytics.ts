@@ -1,5 +1,12 @@
 import { compareText } from "../core/order.js";
 import {
+  type CodexReadEventReader,
+  type CodexReadIndex,
+  CodexReadSummary,
+  readCodexReadIndex,
+  traceInstructionReads,
+} from "../observability/codex-read-analytics.js";
+import {
   AdvisoryFunnel,
   type InvocationEventReader,
   type InvocationIndex,
@@ -49,12 +56,14 @@ interface Counts {
   totalLines: number;
   validTraces: number;
   invalidLines: number;
+  unsupportedVersions: number;
   matchedTraces: number;
 }
 const emptyCounts = (): Counts => ({
   totalLines: 0,
   validTraces: 0,
   invalidLines: 0,
+  unsupportedVersions: 0,
   matchedTraces: 0,
 });
 async function* matching(
@@ -65,6 +74,10 @@ async function* matching(
   const fixed = { ...filter, nowMs: filter.nowMs ?? Date.now() };
   for await (const item of reader.read()) {
     counts.totalLines++;
+    if (item.kind === "unsupported") {
+      counts.unsupportedVersions++;
+      continue;
+    }
     if (item.kind === "invalid") {
       counts.invalidLines++;
       continue;
@@ -115,8 +128,12 @@ export async function summarizeTraces(
   reader: TraceReader,
   filter: TraceFilter = {},
   invocationIndex?: InvocationIndex,
+  codexReadIndex?: CodexReadIndex,
 ) {
   const counts = emptyCounts();
+  const reads = codexReadIndex
+    ? new CodexReadSummary(codexReadIndex)
+    : undefined;
   const funnel = invocationIndex
     ? new AdvisoryFunnel(invocationIndex)
     : undefined;
@@ -131,6 +148,7 @@ export async function summarizeTraces(
   let totalSelected = 0;
   for await (const trace of matching(reader, counts, filter)) {
     funnel?.add(trace);
+    reads?.add(trace);
     agents[trace.agent]++;
     modes[trace.mode]++;
     if (trace.mode === "advisory") {
@@ -181,9 +199,15 @@ export async function summarizeTraces(
     (s) => s.selected > 0,
   ).length;
   return {
-    version: 1 as const,
+    version: 2 as const,
     ...counts,
     agents,
+    ...(reads
+      ? {
+          instructionReads: reads.result(),
+          instructionReadHealth: codexReadIndex?.health,
+        }
+      : {}),
     outcomes,
     modes,
     advisory,
@@ -232,12 +256,13 @@ export async function listTraces(
     traces.splice(index < 0 ? traces.length : index, 0, view);
     if (traces.length > limit) traces.pop();
   }
-  return { version: 1 as const, ...counts, traces };
+  return { version: 2 as const, ...counts, traces };
 }
 export async function showTrace(
   reader: TraceReader,
   id: string,
   invocationReader?: InvocationEventReader,
+  codexReader?: CodexReadEventReader,
 ) {
   if (!routeTraceV1Schema.shape.traceId.safeParse(id).success)
     throw new Error("Trace ID must be a complete UUID.");
@@ -259,9 +284,17 @@ export async function showTrace(
         )
       : undefined;
   return {
-    version: 1 as const,
+    version: 2 as const,
     ...counts,
     trace: found,
+    ...(codexReader && correlation?.agent === "codex"
+      ? {
+          instructionReads: traceInstructionReads(
+            correlation,
+            await readCodexReadIndex(codexReader),
+          ),
+        }
+      : {}),
     ...(invocations ? { modelInvocations: invocations } : {}),
   };
 }

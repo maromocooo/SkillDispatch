@@ -38,7 +38,7 @@ export async function discoverCommand(
     );
   for (const [origin, counts] of Object.entries({
     ...Object.fromEntries(
-      Object.entries(summary.claudeOrigins).map(([k, v]) => [`Claude ${k}`, v]),
+      Object.entries(summary.claudeOrigins).map(([k, v]) => [k, v]),
     ),
     ...Object.fromEntries(
       Object.entries(summary.codexOrigins).map(([k, v]) => [`Codex ${k}`, v]),

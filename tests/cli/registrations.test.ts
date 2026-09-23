@@ -60,7 +60,21 @@ describe("hooks CLI", () => {
           execution: null,
           command: null,
           configSource: "~/.codex/hooks.json",
-          issues: [],
+          issues: [
+            "codex_contract_unverified",
+            "skill_instruction_telemetry_incomplete",
+          ],
+          codexContract: "unverified",
+          instructionObservers: {
+            ready: false,
+            events: ["PreToolUse", "PostToolUse"].map((event) => ({
+              event,
+              matcher: "Bash",
+              registration: "not-installed",
+              execution: null,
+              registrations: 0,
+            })),
+          },
           registrations: 0,
         },
         {

@@ -1,3 +1,4 @@
+import { readCodexReadIndex } from "../../observability/codex-read-analytics.js";
 import { readInvocationIndex } from "../../observability/invocation-analytics.js";
 import { loadOperations } from "../../ops/context.js";
 import {
@@ -44,6 +45,7 @@ export async function tracesCommand(
       context.reader,
       filter,
       await readInvocationIndex(context.invocationReader),
+      await readCodexReadIndex(context.codexReadReader),
     );
     if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
     else {
@@ -70,6 +72,7 @@ export async function tracesCommand(
       context.reader,
       id ?? "",
       context.invocationReader,
+      context.codexReadReader,
     );
     if (options.json) io.stdout(`${JSON.stringify(result, null, 2)}\n`);
     else {
