@@ -2,6 +2,7 @@ import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { route } from "../core/route.js";
 import type { RouteResult } from "../core/types.js";
+import { supportedCodexContract } from "../hosts/codex-contract.js";
 import { invocationPath } from "../observability/invocation-storage.js";
 import type { RouterProvider } from "../providers/types.js";
 import {
@@ -19,6 +20,7 @@ import {
 import { createRouteTrace, routingOutcome } from "../telemetry/trace.js";
 import type { TraceSink } from "../telemetry/types.js";
 import { buildClaudeAdvisory } from "./advisory.js";
+import { buildCodexAdvisory } from "./codex-advisory.js";
 import type { HookInput } from "./types.js";
 
 interface HookServices {
@@ -46,7 +48,8 @@ export async function runHook(
       makeSink: (path) => new JsonlTraceSink(path),
       canAdvise: async () => false,
       invocationObserverConfigured: async () => false,
-      buildAdvisory: buildClaudeAdvisory,
+      buildAdvisory:
+        input.agent === "codex" ? buildCodexAdvisory : buildClaudeAdvisory,
       ...overrides,
     };
     const context = await services.loadContext(
@@ -56,7 +59,9 @@ export async function runHook(
     const { config, catalog, cwd } = context;
     if (!config.telemetry.enabled) return;
     const mode =
-      input.agent === "claude-code" ? config.hook.modes.claude : "shadow";
+      input.agent === "claude-code"
+        ? config.hook.modes.claude
+        : config.hook.modes.codex;
     const path = tracePath(environment, config.telemetry.tracePath);
     const directory = dataDirectory(environment);
     // A configured trace destination must never append JSON into the installation key.
@@ -111,14 +116,18 @@ export async function runHook(
       result.selected.length
     ) {
       try {
-        if (await services.canAdvise())
+        if (
+          (input.agent !== "codex" ||
+            supportedCodexContract(config.hook.codexContract)) &&
+          (await services.canAdvise())
+        )
           advisory = services.buildAdvisory(result.selected, catalog.skills);
         else
           advisory.diagnostics.push({
             code: "advisory_registration_not_ready",
             level: "warning",
             message:
-              "Synchronous Claude registration must be reconciled before advisory delivery.",
+              "Synchronous supported host registration must be reconciled before advisory delivery.",
           });
       } catch {
         advisory = {
@@ -147,13 +156,18 @@ export async function runHook(
       }
     }
     const trace = createRouteTrace({
+      schemaVersion: input.agent === "codex" ? "2.0" : "1.0",
       ...(invocationObserverConfigured
         ? { capabilities: { skillInvocationTelemetry: true as const } }
         : {}),
       agent: input.agent,
       mode,
       delivery: {
-        kind: advisory.output ? "claude-advisory" : "none",
+        kind: advisory.output
+          ? input.agent === "codex"
+            ? "codex-advisory"
+            : "claude-advisory"
+          : "none",
         injectedSkillIds: advisory.injectedSkillIds,
       },
       prompt: input.prompt,

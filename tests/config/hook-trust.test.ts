@@ -28,9 +28,9 @@ describe("source-aware hook configuration", () => {
       );
       const { config } = await loadConfig({ ...ctx, mode: "hook" });
       expect(config.hook.trustProjectConfig).toBe(trusted === true);
-      expect(config.router.provider).toBe(trusted === true ? "mock" : "jev");
+      expect(config.router.provider).toBe("jev");
       expect(config.policy.threshold).toBe(trusted === true ? 0.2 : 0.8);
-      expect(config.telemetry.prompt).toBe(trusted === true ? "raw" : "hash");
+      expect(config.telemetry.prompt).toBe("hash");
     },
   );
 
@@ -90,7 +90,7 @@ describe("source-aware hook configuration", () => {
     ).toBe(true);
     expect(
       (await loadConfig({ ...ctx, mode: "hook" })).config.router.provider,
-    ).toBe("mock");
+    ).toBe("jev");
   });
 
   it.each(['"true"', "1", "null"])(

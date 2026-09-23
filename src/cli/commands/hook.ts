@@ -41,7 +41,7 @@ export async function hookCommand(
           if (!environment.execution) return false;
           const execution = await resolveExecution(environment.execution);
           const status = await inspectRegistration(
-            "claude",
+            host,
             environment,
             execution,
           );

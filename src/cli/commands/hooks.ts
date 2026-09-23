@@ -45,6 +45,14 @@ export async function hooksStatus(
             `  ${event.event} Skill: ${event.registration} ${event.execution ?? "-"}\n`,
           );
       }
+      if (status.instructionObservers) {
+        io.stdout(`Codex contract: ${status.codexContract}; host reload/trust unconfirmed
+Instruction read observers: ${status.instructionObservers.ready ? "installed" : "incomplete"}
+`);
+        for (const event of status.instructionObservers.events)
+          io.stdout(`  ${event.event} Bash: ${event.registration} ${event.execution ?? "-"}
+`);
+      }
       if (status.command)
         io.stdout(
           `Command: ${terminalText(status.command.command)}${status.command.args ? ` ${terminalText(JSON.stringify(status.command.args))}` : ""}\n`,
@@ -97,7 +105,7 @@ export async function hooksMutation(
       );
     io.stdout(
       result.mode === "advisory"
-        ? "Claude advisory: synchronous same-turn recommendations. Reload host hooks after changing registration.\n"
+        ? `${host} advisory: synchronous same-turn recommendations. Reload host hooks after changing registration.\n`
         : "Shadow only. Async delivery depends on host lifetime; missing trace does not mean no skill was selected.\n",
     );
   }

@@ -7,7 +7,7 @@ import {
   traceInvocations,
 } from "../observability/invocation-analytics.js";
 import type { TraceReader } from "./reader.js";
-import { type RouteTrace, routeTraceSchema } from "./types.js";
+import { type RouteTrace, routeTraceV1Schema } from "./types.js";
 import {
   type TraceDetailView,
   type TraceListView,
@@ -239,7 +239,7 @@ export async function showTrace(
   id: string,
   invocationReader?: InvocationEventReader,
 ) {
-  if (!routeTraceSchema.shape.traceId.safeParse(id).success)
+  if (!routeTraceV1Schema.shape.traceId.safeParse(id).success)
     throw new Error("Trace ID must be a complete UUID.");
   let found: TraceDetailView | undefined;
   let correlation: RouteTrace | undefined;

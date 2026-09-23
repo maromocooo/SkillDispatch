@@ -79,6 +79,19 @@ export async function loadConfig(options: {
         path,
       });
     const file = parsed.data;
+    if (source === "user" && file.hook?.codexContract !== undefined)
+      config.hook.codexContract = file.hook.codexContract;
+    if (source === "project" && options.mode === "hook") {
+      // Trusted project routing policy never owns credentials, provider or persistence.
+      if (file.telemetry || file.router)
+        diagnostics.push({
+          code: "ignored_config_setting",
+          level: "warning",
+          message: "Project security-sensitive hook settings ignored.",
+        });
+      delete file.telemetry;
+      delete file.router;
+    }
     if (file.hook?.trustProjectConfig !== undefined) {
       if (source === "user")
         config.hook.trustProjectConfig = file.hook.trustProjectConfig;

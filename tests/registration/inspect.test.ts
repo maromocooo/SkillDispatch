@@ -123,9 +123,16 @@ describe.each(["codex", "claude"] as const)(
       const env = {
         [host === "codex" ? "CODEX_HOME" : "CLAUDE_CONFIG_DIR"]: ctx.repo,
       };
-      expect(
-        (await inspectRegistration(host, { ...ctx, env }, execution)).issues,
-      ).toContain("custom_host_directory_manual_action_required");
+      const status = await inspectRegistration(
+        host,
+        { ...ctx, env },
+        execution,
+      );
+      if (host === "claude")
+        expect(status.issues).toContain(
+          "custom_host_directory_manual_action_required",
+        );
+      else expect(status.registration).toBe("not-installed");
     });
   },
 );

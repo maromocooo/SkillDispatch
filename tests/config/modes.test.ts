@@ -21,7 +21,7 @@ it("only explicit user config enables Claude advisory", async () => {
 });
 it.each([
   "{claude: enforce}",
-  "{codex: advisory}",
+  "{codex: enforce}",
   "{claude: true}",
   "advisory",
   "{claude: null}",

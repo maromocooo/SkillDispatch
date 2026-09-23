@@ -12,11 +12,13 @@ import {
   digestSchema,
   type PromptStorage,
   type RouteTrace,
+  type RouteTraceV1,
   routeTraceSchema,
   safeModelSchema,
 } from "./types.js";
 
 export interface TraceInput {
+  schemaVersion?: "1.0" | "2.0";
   agent: RouteTrace["agent"];
   mode?: RouteTrace["mode"];
   delivery?: RouteTrace["delivery"];
@@ -33,6 +35,10 @@ export interface TraceInput {
 }
 
 /** Explicit allowlist projection. Never spread a host payload or domain diagnostic. */
+export function createRouteTrace(
+  input: TraceInput & { schemaVersion?: "1.0" },
+): RouteTraceV1;
+export function createRouteTrace(input: TraceInput): RouteTrace;
 export function createRouteTrace(input: TraceInput): RouteTrace {
   const { result, skills, agent, key } = input;
   const byId = new Map(skills.map((skill) => [skill.id, skill]));
@@ -58,7 +64,7 @@ export function createRouteTrace(input: TraceInput): RouteTrace {
   const hostModel = safeModelSchema.safeParse(input.hostModel);
   const routerModel = safeModelSchema.safeParse(result.router.model);
   return routeTraceSchema.parse({
-    schemaVersion: "1.0",
+    schemaVersion: input.schemaVersion ?? "1.0",
     traceId: randomUUID(),
     timestamp: new Date().toISOString(),
     agent,

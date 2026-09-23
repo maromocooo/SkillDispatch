@@ -23,16 +23,19 @@ export interface HookStatus {
   configSource: string;
   issues: string[];
   registrations: number;
-  skillObservers?: {
-    ready: boolean;
-    events: Array<{
-      event: "PreToolUse" | "PostToolUse" | "PostToolUseFailure";
-      matcher: "Skill";
-      registration: "installed" | "not-installed" | "conflict";
-      execution: "async" | "sync" | null;
-      registrations: number;
-    }>;
-  };
+  codexContract?: "source-verified-user-target" | "unverified";
+  instructionObservers?: ObserverStatus;
+  skillObservers?: ObserverStatus;
+}
+export interface ObserverStatus {
+  ready: boolean;
+  events: Array<{
+    event: "PreToolUse" | "PostToolUse" | "PostToolUseFailure";
+    matcher: string;
+    registration: "installed" | "not-installed" | "conflict";
+    execution: "async" | "sync" | null;
+    registrations: number;
+  }>;
 }
 export class RegistrationError extends Error {
   constructor(readonly code: string) {
