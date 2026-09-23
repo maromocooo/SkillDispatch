@@ -28,6 +28,12 @@ async function fixture() {
   return { ...c, env: { CODEX_HOME: home }, codex: home, pluginRoot: root };
 }
 describe("Codex native local state", () => {
+  it("rejects a relative configuration root without guessing against process cwd", async () => {
+    const c = await workspace();
+    await expect(
+      adapter().discover({ ...c, env: { CODEX_HOME: "PRIVATE_RELATIVE" } }),
+    ).rejects.toThrow("Invalid Codex configuration root.");
+  });
   it("finds user/system/plugins alongside existing sources with origins and unconfirmed session availability", async () => {
     const c = await fixture();
     const a = await adapter().discover(c);
@@ -183,4 +189,113 @@ describe("Codex native local state", () => {
       catalogFingerprint(x.skills),
     );
   });
+});
+
+it("does not let cache aliases bypass disabled plugin state, and deduplicates active aliases", async () => {
+  const c = await fixture();
+  await symlink(
+    join(c.pluginRoot, "skills/review"),
+    join(c.codex, "skills/alias"),
+  );
+  const active = await adapter().discover(c);
+  expect(
+    active.skills.filter((s) => s.path.endsWith("skills/review/SKILL.md")),
+  ).toHaveLength(1);
+  expect(active.skills.find((s) => s.name === "foo:review")?.enabled).toBe(
+    true,
+  );
+  await write(
+    join(c.codex, "config.toml"),
+    '[plugins."foo@market"]\nenabled=false',
+  );
+  expect(
+    (await adapter().discover(c)).skills
+      .filter((s) => s.path.endsWith("skills/review/SKILL.md"))
+      .every((s) => !s.enabled),
+  ).toBe(true);
+});
+it("keeps malformed plugin policy from disabling healthy local sources", async () => {
+  const c = await fixture();
+  await write(
+    join(c.codex, "config.toml"),
+    '[plugins."foo@market"]\nenabled="bad"',
+  );
+  const r = await adapter().discover(c);
+  expect(r.skills.some((s) => s.name === "foo:review")).toBe(false);
+  expect(r.skills.find((s) => s.name === "user-skill")?.enabled).toBe(true);
+});
+it("loads trusted legacy project skills and ignores explicitly untrusted child settings", async () => {
+  const c = await fixture();
+  await write(
+    join(c.repo, ".codex/skills/legacy/SKILL.md"),
+    skillText("legacy"),
+  );
+  await write(
+    join(c.cwd, ".codex/config.toml"),
+    '[plugins."foo@market"]\nenabled=false',
+  );
+  await write(
+    join(c.codex, "config.toml"),
+    `[projects.${JSON.stringify(c.repo)}]\ntrust_level="trusted"\n[projects.${JSON.stringify(c.cwd)}]\ntrust_level="untrusted"\n[plugins."foo@market"]\nenabled=true`,
+  );
+  const r = await adapter().discover(c);
+  expect(r.skills.some((s) => s.name === "legacy")).toBe(true);
+  expect(r.skills.some((s) => s.name === "foo:review")).toBe(true);
+});
+it.each(["../escape", "./../../escape", "/outside"])(
+  "rejects manifest component traversal %s",
+  async (skills) => {
+    const c = await fixture();
+    await write(
+      join(c.pluginRoot, ".codex-plugin/plugin.json"),
+      JSON.stringify({ name: "foo", skills }),
+    );
+    expect(
+      (await adapter().discover(c)).skills.some((s) => s.name === "foo:review"),
+    ).toBe(false);
+  },
+);
+it("supports portable direct-child skills and does not promote unsupported extension state", async () => {
+  const c = await fixture();
+  await write(
+    join(c.pluginRoot, "plugin.json"),
+    JSON.stringify({
+      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      name: "portable",
+    }),
+  );
+  await write(
+    join(c.pluginRoot, "skills/nested/deeper/SKILL.md"),
+    skillText("deep"),
+  );
+  let r = await adapter().discover(c);
+  expect(r.skills.some((s) => s.name === "portable:review")).toBe(true);
+  expect(r.skills.some((s) => s.name === "portable:deep")).toBe(false);
+  await write(
+    join(c.pluginRoot, "plugin.json"),
+    JSON.stringify({
+      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      name: "portable",
+      extensions: { future: {} },
+    }),
+  );
+  r = await adapter().discover(c);
+  expect(r.skills.some((s) => s.name === "portable:review")).toBe(false);
+  expect(
+    r.diagnostics.some((d) => d.code === "unsupported_codex_plugin_extension"),
+  ).toBe(true);
+});
+it("applies file-managed marketplace restrictions conservatively without losing local catalog", async () => {
+  const c = await fixture(),
+    admin = join(c.root, "admin/skills");
+  await mkdir(admin, { recursive: true });
+  await write(
+    join(admin, "../requirements.toml"),
+    "[marketplaces]\nrestrict_to_allowed_sources=true",
+  );
+  const r = await new CodexDiscoveryAdapter({ adminRoots: [admin] }).discover(
+    c,
+  );
+  expect(r.skills.some((s) => s.name === "foo:review")).toBe(false);
+  expect(r.skills.find((s) => s.name === "user-skill")?.enabled).toBe(true);
 });

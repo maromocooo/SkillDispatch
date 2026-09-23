@@ -5,8 +5,11 @@ import type { Diagnostic } from "../core/types.js";
 import { canonicalPath, readOptional } from "./filesystem.js";
 import type { DiscoveryContext } from "./types.js";
 
-export const codexHome = (c: DiscoveryContext) =>
-  c.env?.CODEX_HOME || join(c.home, ".codex");
+export function codexHome(c: DiscoveryContext): string {
+  const root = c.env?.CODEX_HOME || join(c.home, ".codex");
+  if (!isAbsolute(root)) throw new Error("Invalid Codex configuration root.");
+  return root;
+}
 export const codexDiagnostic = (diagnostics: Diagnostic[], code: string) =>
   diagnostics.push({
     code,
@@ -57,6 +60,11 @@ export async function loadCodexSettings(
     // The admin source's sibling config/requirements are file-managed authority.
     const config = await document(join(root, "..", "config.toml"));
     layers.push(config);
+    const legacy = await document(join(root, "..", "managed_config.toml"));
+    if (Object.keys(legacy).length) {
+      valid = false;
+      codexDiagnostic(diagnostics, "codex_managed_config_unresolved");
+    }
     const requirements = await document(join(root, "..", "requirements.toml"));
     if (requirements.marketplaces !== undefined) {
       pluginsValid = false;
@@ -69,26 +77,40 @@ export async function loadCodexSettings(
   }
   layers.push(user);
   const projects = record.safeParse(user.projects);
-  // Only explicitly trusted canonical repository roots authorize project config.
-  const trusted = new Set<string>();
+  const trust = new Map<string, unknown>();
   if (projects.success)
     for (const [path, value] of Object.entries(projects.data)) {
-      if (
-        isAbsolute(path) &&
-        record.safeParse(value).success &&
-        (value as Record<string, unknown>).trust_level === "trusted"
-      )
-        trusted.add(await canonicalPath(path));
+      if (isAbsolute(path) && record.safeParse(value).success)
+        trust.set(
+          await canonicalPath(path),
+          (value as Record<string, unknown>).trust_level,
+        );
     }
   const repo = directories.at(-1);
-  if (repo && trusted.has(await canonicalPath(repo))) {
-    for (const directory of [...directories].reverse())
+  const trustedDirectories: string[] = [];
+  for (const directory of [...directories].reverse()) {
+    const decision =
+      trust.get(await canonicalPath(directory)) ??
+      (repo ? trust.get(await canonicalPath(repo)) : undefined);
+    if (decision === "trusted") {
       layers.push(await document(join(directory, ".codex/config.toml")));
+      trustedDirectories.push(directory);
+    }
   }
   const plugins: Record<string, { enabled: boolean }> = {};
+  let pluginsEnabled = true;
   let includeInstructions = true,
     bundled = true;
   for (const layer of layers) {
+    const features = record.safeParse(layer.features);
+    if (features.success && features.data.plugins !== undefined) {
+      if (typeof features.data.plugins === "boolean")
+        pluginsEnabled = features.data.plugins;
+      else {
+        pluginsValid = false;
+        codexDiagnostic(diagnostics, "invalid_codex_plugin_policy");
+      }
+    }
     if (layer.profile !== undefined) {
       // Session profile selection/overrides are not reconstructible from a hook payload.
       valid = false;
@@ -137,7 +159,8 @@ export async function loadCodexSettings(
     }
   return {
     valid,
-    pluginsValid,
+    pluginsValid: pluginsValid && pluginsEnabled,
+    trustedDirectories,
     plugins,
     rules,
     includeInstructions,

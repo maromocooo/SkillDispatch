@@ -12,6 +12,7 @@ import {
 import { codexReadEvents } from "../hosts/codex-contract.js";
 import type { RuntimeEnvironment } from "../runtime/context.js";
 import { keyedHash } from "../telemetry/privacy.js";
+import { assertTraceDestination } from "../telemetry/reader.js";
 import { dataDirectory, installationKey } from "../telemetry/storage.js";
 import {
   CodexReadSink,
@@ -117,6 +118,7 @@ export async function observeCodexRead(
     if (!input) return; // No filesystem work for unrelated commands.
     const storage = await codexReadStorageContext(environment);
     if (!storage.enabled) return;
+    await assertTraceDestination(storage.path, storage.protectedPaths);
     const canonical = await realpath(input.path).catch(() => input.path);
     const key = await installationKey(dataDirectory(environment));
     let skills: SkillDescriptor[] = [];

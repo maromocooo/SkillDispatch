@@ -179,3 +179,58 @@ describe("Codex user-owned advisory", () => {
     expect(traceInput().key.byteLength).toBe(32);
   });
 });
+
+it.each(["partial", "failed", "timeout"])(
+  "Codex advisory remains silent on %s routing",
+  async (failure) => {
+    const c = await workspace();
+    await write(
+      join(c.home, ".config/skilldispatch/config.yaml"),
+      'hook: {codexContract: "0.155.1", modes: {codex: advisory}}\nrouter: {provider: mock, timeoutMs: 5}',
+    );
+    const output = await runHook(
+      {
+        agent: "codex",
+        cwd: c.cwd,
+        prompt: "synthetic",
+        sessionId: "s",
+        promptCorrelationId: "t",
+      },
+      { ...c, env: { SKILLDISPATCH_DATA_DIR: join(c.root, "data") } },
+      {
+        canAdvise: async () => true,
+        createProvider: () => ({
+          name: "mock",
+          judge: async (input) => {
+            if (failure === "failed") throw new Error("PRIVATE_FAILURE");
+            if (failure === "timeout")
+              await new Promise((resolve) => setTimeout(resolve, 30));
+            return {
+              completeness: "partial",
+              decisions: [],
+              failedSkillIds: input.candidates.map((s) => s.id),
+            };
+          },
+        }),
+      },
+    );
+    expect(output).toBeUndefined();
+  },
+);
+it("project config cannot elevate Codex mode or declare a supported contract", async () => {
+  const c = await workspace();
+  await write(
+    join(c.home, ".config/skilldispatch/config.yaml"),
+    "hook: {trustProjectConfig: true}\nrouter: {provider: mock, mock: {defaultProbability: 0.9}}",
+  );
+  await write(
+    join(c.cwd, ".skilldispatch.yaml"),
+    'hook: {codexContract: "0.155.1", modes: {codex: advisory}}\ntelemetry: {prompt: raw}\nrouter: {provider: jev}',
+  );
+  const { loadConfig } = await import("../../src/config/load.js");
+  const { config } = await loadConfig({ ...c, mode: "hook" });
+  expect(config.hook.modes.codex).toBe("shadow");
+  expect(config.hook.codexContract).toBeUndefined();
+  expect(config.telemetry.prompt).toBe("hash");
+  expect(config.router.provider).toBe("mock");
+});

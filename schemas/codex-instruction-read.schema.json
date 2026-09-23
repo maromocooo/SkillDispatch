@@ -26,10 +26,7 @@
     },
     "phase": {
       "type": "string",
-      "enum": [
-        "attempted",
-        "terminal-observed"
-      ]
+      "enum": ["attempted", "terminal-observed"]
     },
     "outcome": {
       "type": "string",
@@ -58,9 +55,7 @@
               "const": false
             }
           },
-          "required": [
-            "resolved"
-          ],
+          "required": ["resolved"],
           "additionalProperties": false
         },
         {
@@ -110,16 +105,10 @@
       "properties": {
         "kind": {
           "type": "string",
-          "enum": [
-            "main",
-            "subagent",
-            "unknown"
-          ]
+          "enum": ["main", "subagent", "unknown"]
         }
       },
-      "required": [
-        "kind"
-      ],
+      "required": ["kind"],
       "additionalProperties": false
     }
   },

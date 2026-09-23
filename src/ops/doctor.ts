@@ -446,7 +446,7 @@ export async function runDoctor(
     }
     add(
       "trace_health",
-      invalid ? "WARN" : "PASS",
+      invalid || unsupported ? "WARN" : "PASS",
       `Valid traces: ${valid}; invalid lines: ${invalid}; unsupported versions: ${unsupported}.`,
     );
     add("valid_traces", "PASS", "Validated trace count.", valid);

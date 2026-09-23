@@ -14,6 +14,23 @@ async function setup(user = "router:\n  provider: mock\n") {
   return { ...ctx, directory, env: { SKILLDISPATCH_DATA_DIR: directory } };
 }
 describe("offline installation doctor", () => {
+  it("warns on unsupported trace versions without labeling them corrupt", async () => {
+    const ctx = await setup();
+    await installationKey(ctx.directory);
+    await writeFile(
+      join(ctx.directory, "traces.jsonl"),
+      `${JSON.stringify({ schemaVersion: "99.0" })}\n`,
+      { mode: 0o600 },
+    );
+    const result = await runDoctor(ctx);
+    expect(result.checks.find((c) => c.code === "trace_health")).toMatchObject({
+      status: "WARN",
+      detail: "Valid traces: 0; invalid lines: 0; unsupported versions: 1.",
+    });
+    expect(result.checks.find((c) => c.code === "invalid_lines")?.value).toBe(
+      0,
+    );
+  });
   it("reports a usable empty install without creating directories or keys", async () => {
     const ctx = await setup();
     const before = await readdir(ctx.root);

@@ -54,6 +54,11 @@ export async function checkCodexInline(path: string) {
   } catch {
     throw new RegistrationError("malformed_codex_toml");
   }
+  const features = (parsed as { features?: { hooks?: unknown } }).features;
+  if (features?.hooks === false)
+    throw new RegistrationError("host_hooks_disabled");
+  if (features?.hooks !== undefined && typeof features.hooks !== "boolean")
+    throw new RegistrationError("malformed_codex_toml");
   if (Object.hasOwn(parsed, "hooks"))
     throw new RegistrationError("codex_inline_hooks_manual_action_required");
 }

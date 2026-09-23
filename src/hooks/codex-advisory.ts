@@ -35,7 +35,7 @@ export function buildCodexAdvisory(
       code = "advisory_ambiguous_skill_invocation";
     else if (
       Buffer.byteLength(
-        introduction + lines.join("") + `- ${name}\n` + conclusion,
+        `${introduction}${lines.join("")}- ${name}\n${conclusion}`,
       ) > MAX_ADVISORY_BYTES
     )
       code = "advisory_context_limit";

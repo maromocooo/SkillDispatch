@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { parseDocument } from "yaml";
 import { z } from "zod";
 import { finalizeCatalog } from "./catalog.js";
@@ -51,6 +51,10 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
         scope: "repo" as const,
       })),
       { path: join(context.home, ".agents/skills"), scope: "user" },
+      ...settings.trustedDirectories.map((directory) => ({
+        path: join(directory, ".codex/skills"),
+        scope: "repo" as const,
+      })),
       { path: join(home, "skills/.system"), scope: "system" },
       { path: join(home, "skills"), scope: "user" },
       ...adminRoots.map((path) => ({
@@ -75,7 +79,7 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
       settings.valid && settings.pluginsValid,
       this.options.targetPath,
     );
-    result.skills.push(...plugins.skills);
+    result.skills.unshift(...plugins.skills);
     result.diagnostics.push(...settings.diagnostics, ...plugins.diagnostics);
     const unique = finalizeCatalog([result]);
     result.skills = unique.skills;
@@ -100,6 +104,20 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
           modelInvocable: true,
           sessionAvailability: "unconfirmed",
         } satisfies CodexSkillMetadata);
+      const inCache = relative(join(home, "plugins/cache"), skill.path);
+      if (
+        metadata.origin !== "plugin" &&
+        !inCache.startsWith("..") &&
+        !isAbsolute(inCache)
+      ) {
+        configuredEnabled = false;
+        result.diagnostics.push({
+          code: "codex_plugin_alias_unresolved",
+          level: "warning",
+          message:
+            "Plugin alias excluded without verified owning installation.",
+        });
+      }
       metadata.configuredEnabled = configuredEnabled;
       skill.metadata.codex = metadata;
       if (
@@ -124,8 +142,7 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
           );
           if (
             parsed.policy?.allow_implicit_invocation === false ||
-            (parsed.policy?.products?.length &&
-              !parsed.policy.products.includes("codex"))
+            parsed.policy?.products?.length
           ) {
             skill.enabled = false;
             skill.metadata.disabledReason = "explicit_invocation_only";

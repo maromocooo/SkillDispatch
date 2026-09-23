@@ -4,7 +4,10 @@ import { z } from "zod";
 import { catalogFingerprint } from "../../src/telemetry/fingerprint.js";
 import { keyedHash } from "../../src/telemetry/privacy.js";
 import { createRouteTrace } from "../../src/telemetry/trace.js";
-import { routeTraceSchema, routeTraceV1Schema } from "../../src/telemetry/types.js";
+import {
+  routeTraceSchema,
+  routeTraceV1Schema,
+} from "../../src/telemetry/types.js";
 import {
   digest,
   schemaValidator,

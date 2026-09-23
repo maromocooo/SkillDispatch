@@ -79,11 +79,13 @@ export function renderTraceDetail(
   out.section("Recommendation summary");
   out.facts([
     ["Recommended", t.selectedCount],
-    ["Injected", t.injectedCount],
+    [t.agent === "codex" ? "Emitted" : "Injected", t.injectedCount],
   ]);
   if (!t.selectedCount) out.text("No skill recommendation selected.");
   out.text(
-    "Recommendation, injection and observed invocation are separate events.",
+    t.agent === "codex"
+      ? "Recommendation, context emission and observed instruction reads are separate events."
+      : "Recommendation, injection and observed invocation are separate events.",
   );
   out.section("Skill decisions");
   if (!t.decisions.length) out.text("No skill decisions recorded.");
@@ -94,7 +96,7 @@ export function renderTraceDetail(
       { label: "Scope" },
       { label: "Score", numeric: true },
       { label: "Recommended" },
-      { label: "Injected" },
+      { label: t.agent === "codex" ? "Emitted" : "Injected" },
     ],
     t.decisions.map((d) => [
       d.name,

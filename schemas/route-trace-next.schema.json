@@ -22,10 +22,7 @@
     },
     "mode": {
       "type": "string",
-      "enum": [
-        "shadow",
-        "advisory"
-      ]
+      "enum": ["shadow", "advisory"]
     },
     "capabilities": {
       "type": "object",
@@ -45,10 +42,7 @@
       "properties": {
         "kind": {
           "type": "string",
-          "enum": [
-            "none",
-            "codex-advisory"
-          ]
+          "enum": ["none", "codex-advisory"]
         },
         "injectedSkillIds": {
           "type": "array",
@@ -58,10 +52,7 @@
           }
         }
       },
-      "required": [
-        "kind",
-        "injectedSkillIds"
-      ],
+      "required": ["kind", "injectedSkillIds"],
       "additionalProperties": false
     },
     "prompt": {
@@ -74,9 +65,7 @@
               "const": "none"
             }
           },
-          "required": [
-            "storage"
-          ],
+          "required": ["storage"],
           "additionalProperties": false
         },
         {
@@ -92,10 +81,7 @@
               "description": "Installation-local HMAC of exact prompt text; identical text correlates across submissions."
             }
           },
-          "required": [
-            "storage",
-            "hash"
-          ],
+          "required": ["storage", "hash"],
           "additionalProperties": false
         },
         {
@@ -109,10 +95,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "storage",
-            "raw"
-          ],
+          "required": ["storage", "raw"],
           "additionalProperties": false
         }
       ]
@@ -138,9 +121,7 @@
           "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
         }
       },
-      "required": [
-        "event"
-      ],
+      "required": ["event"],
       "additionalProperties": false
     },
     "catalog": {
@@ -161,11 +142,7 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "fingerprint",
-        "skillCount",
-        "enabledSkillCount"
-      ],
+      "required": ["fingerprint", "skillCount", "enabledSkillCount"],
       "additionalProperties": false
     },
     "router": {
@@ -184,10 +161,7 @@
           "minimum": 0
         }
       },
-      "required": [
-        "provider",
-        "latencyMs"
-      ],
+      "required": ["provider", "latencyMs"],
       "additionalProperties": false
     },
     "policy": {
@@ -204,19 +178,12 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "threshold",
-        "maxSkills"
-      ],
+      "required": ["threshold", "maxSkills"],
       "additionalProperties": false
     },
     "outcome": {
       "type": "string",
-      "enum": [
-        "complete",
-        "partial",
-        "failed"
-      ]
+      "enum": ["complete", "partial", "failed"]
     },
     "decisions": {
       "type": "array",
@@ -233,21 +200,11 @@
           },
           "agent": {
             "type": "string",
-            "enum": [
-              "codex",
-              "claude-code",
-              "generic"
-            ]
+            "enum": ["codex", "claude-code", "generic"]
           },
           "scope": {
             "type": "string",
-            "enum": [
-              "repo",
-              "user",
-              "admin",
-              "system",
-              "unknown"
-            ]
+            "enum": ["repo", "user", "admin", "system", "unknown"]
           },
           "contentHash": {
             "type": "string",
@@ -291,11 +248,7 @@
           },
           "level": {
             "type": "string",
-            "enum": [
-              "info",
-              "warning",
-              "error"
-            ]
+            "enum": ["info", "warning", "error"]
           },
           "skillIds": {
             "type": "array",
@@ -305,10 +258,7 @@
             }
           }
         },
-        "required": [
-          "code",
-          "level"
-        ],
+        "required": ["code", "level"],
         "additionalProperties": false
       }
     }
