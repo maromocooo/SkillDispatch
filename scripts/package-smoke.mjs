@@ -46,6 +46,7 @@ try {
     "claude-invocation-smoke",
     "trace-display-smoke",
     "codex-parity-smoke",
+    "profile-isolation-smoke",
   ]) {
     stage = script;
     const run = spawnSync(
