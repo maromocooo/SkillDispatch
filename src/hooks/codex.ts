@@ -20,6 +20,7 @@ export function parseCodexInput(input: unknown): HookInput | undefined {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return undefined;
   const value = parsed.data;
+  if (value.agent_id !== undefined || value.agent_type !== undefined) return;
   return {
     agent: "codex",
     cwd: value.cwd,

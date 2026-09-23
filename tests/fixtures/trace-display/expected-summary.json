@@ -1,12 +1,37 @@
 {
-  "version": 1,
+  "version": 2,
   "totalLines": 5,
   "validTraces": 4,
   "invalidLines": 1,
+  "unsupportedVersions": 0,
   "matchedTraces": 4,
   "agents": {
     "codex": 0,
     "claude-code": 4
+  },
+  "instructionReads": {
+    "evidence": "skill-instructions-read",
+    "recommended": 0,
+    "emitted": 0,
+    "observedInstructionReadAttemptPairs": 0,
+    "observedTerminalEventPairs": 0,
+    "observerConfiguredTraces": 0,
+    "observerUnavailableTraces": 0,
+    "terminalSuccess": "unsupported",
+    "completeLoad": "unconfirmed"
+  },
+  "instructionReadHealth": {
+    "streamReadable": true,
+    "validEvents": 0,
+    "invalidLines": 0,
+    "unsupportedVersions": 0,
+    "duplicates": 0,
+    "attempted": 0,
+    "terminalObserved": 0,
+    "attemptedOnly": 0,
+    "terminalWithoutAttempt": 0,
+    "unresolved": 0,
+    "conflicting": 0
   },
   "outcomes": {
     "complete": 2,
@@ -58,6 +83,7 @@
     "available": true,
     "validEvents": 2,
     "invalidLines": 0,
+    "unsupportedVersions": 0,
     "duplicates": 0,
     "attempted": 1,
     "succeeded": 1,

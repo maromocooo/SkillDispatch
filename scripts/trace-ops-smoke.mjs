@@ -129,7 +129,11 @@ try {
       const result = run([...command, ...suffix]);
       assert.equal(result.status, 0);
       assert.equal(result.stderr, "");
-      if (suffix.length) assert.equal(JSON.parse(result.stdout).version, 1);
+      if (suffix.length)
+        assert.equal(
+          JSON.parse(result.stdout).version,
+          command[0] === "doctor" ? 1 : 2,
+        );
     }
   }
   assert.equal(

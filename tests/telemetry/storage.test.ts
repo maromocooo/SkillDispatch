@@ -156,7 +156,7 @@ describe("local private telemetry storage", () => {
     await new JsonlTraceSink(path).write({
       ...traceFixture(),
       cwd: "private",
-    } as ReturnType<typeof traceFixture>);
+    } as unknown as ReturnType<typeof traceFixture>);
     await expect(stat(join(ctx.root, "data"))).rejects.toThrow();
   });
 });

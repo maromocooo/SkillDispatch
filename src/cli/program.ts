@@ -2,6 +2,7 @@ import type { Readable } from "node:stream";
 import { Argument, Command, Option } from "commander";
 import { readHookJson } from "../hooks/stdin.js";
 import { observeClaudeSkill } from "../observability/claude-skill-hook.js";
+import { observeCodexRead } from "../observability/codex-read-hook.js";
 import { VERSION } from "../version.js";
 import { discoverCommand } from "./commands/discover.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -87,7 +88,7 @@ export function createProgram(
       .command(host)
       .description(
         host === "codex"
-          ? "Shadow route Codex skills; stdout is always empty"
+          ? "Route Codex skills; explicit supported advisory may emit hook JSON"
           : "Route Claude skills; user-owned mode controls advisory output",
       )
       .action(() => hookCommand(host, environment, stdin, io));
@@ -99,6 +100,18 @@ export function createProgram(
     .action(async () => {
       try {
         await observeClaudeSkill(await readHookJson(stdin), environment);
+      } catch {
+        /* fail open */
+      }
+    });
+  hook
+    .command("codex-read")
+    .description(
+      "Observe a narrow Codex instruction-read request locally; silent and fail-open",
+    )
+    .action(async () => {
+      try {
+        await observeCodexRead(await readHookJson(stdin), environment);
       } catch {
         /* fail open */
       }
@@ -190,7 +203,7 @@ Examples:
   skilldispatch traces summary --since 24h
   skilldispatch eval evals.yaml --json
 
-Shadow is the default. Claude advisory requires user configuration.
+Shadow is the default. Advisory requires user configuration; Codex also requires a verified target contract.
 Jev routing requires TYPESAFE_API_KEY; doctor/status/analytics are offline.
 See https://github.com/maromocooo/SkillDispatch#quick-start
 `,

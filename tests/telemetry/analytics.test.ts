@@ -62,7 +62,7 @@ describe("trace analytics", () => {
     });
     const summary = await summarizeTraces(dataset([a, b, c], true));
     expect(summary).toMatchObject({
-      version: 1,
+      version: 2,
       totalLines: 4,
       validTraces: 3,
       invalidLines: 1,

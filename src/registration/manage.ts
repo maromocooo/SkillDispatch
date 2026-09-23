@@ -1,6 +1,11 @@
+import {
+  codexReadEvents,
+  supportedCodexContract,
+} from "../hosts/codex-contract.js";
 import { invocationEvents } from "../observability/invocation-types.js";
 import { atomicRegistrationWrite, withRegistrationLock } from "./atomic.js";
 import {
+  codexObserverCommand,
   resolveExecution,
   shadowCommand,
   skillObserverCommand,
@@ -13,7 +18,7 @@ import {
 } from "./document.js";
 import { MAX_HOST_CONFIG_BYTES, unchanged } from "./files.js";
 import { checkCodexInline, loadRegistration } from "./inspect.js";
-import { registrationMode } from "./mode.js";
+import { codexContract, registrationMode } from "./mode.js";
 import {
   type CliExecution,
   type Host,
@@ -34,6 +39,12 @@ export async function manageRegistration(
       throw new RegistrationError("codex_sync_not_supported");
     const mode =
       action === "install" ? await registrationMode(host, environment) : null;
+    if (
+      host === "codex" &&
+      mode === "advisory" &&
+      !supportedCodexContract(await codexContract(environment))
+    )
+      throw new RegistrationError("codex_contract_unverified");
     const sync =
       mode === "advisory" || (host === "claude" && options.sync === true);
     const resolved = await resolveExecution(execution);
@@ -70,9 +81,19 @@ export async function manageRegistration(
           "modified_registration_manual_action_required",
         );
       let plan = planDocument(loaded.document, command, action, sync);
-      if (host === "claude") {
-        const observer = skillObserverCommand(resolved);
-        for (const event of invocationEvents) {
+      if (
+        host === "claude" ||
+        action === "uninstall" ||
+        supportedCodexContract(await codexContract(environment))
+      ) {
+        const observer =
+          host === "codex"
+            ? codexObserverCommand(resolved)
+            : skillObserverCommand(resolved);
+        const matcher = host === "codex" ? "Bash" : "Skill";
+        for (const event of host === "codex"
+          ? codexReadEvents
+          : invocationEvents) {
           const document = new HookDocument(plan.text);
           if (
             action === "install" &&
@@ -81,7 +102,7 @@ export async function manageRegistration(
               .some(
                 (h) =>
                   (ownsHandler(h.value, observer) &&
-                    (h.matcher !== "Skill" ||
+                    (h.matcher !== matcher ||
                       h.value.asyncRewake === true ||
                       h.value.if !== undefined)) ||
                   (!ownsHandler(h.value, observer) &&
@@ -97,7 +118,7 @@ export async function manageRegistration(
             action,
             false,
             event,
-            "Skill",
+            matcher,
           );
           if (next.text !== plan.text)
             plan = {

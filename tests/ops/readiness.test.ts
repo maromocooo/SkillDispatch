@@ -103,7 +103,10 @@ it("disabled telemetry is not shadow routing ready, mock needs no key", async ()
 });
 it("unsafe or malformed hook registration is WARN without changing installation exit semantics", async () => {
   const ctx = await fixture();
-  await write(join(ctx.home, ".codex/config.toml"), "[hooks]\n");
+  await write(
+    join(ctx.home, ".codex/config.toml"),
+    'hooks = "PRIVATE_HOST_CONFIG"\n',
+  );
   await write(join(ctx.home, ".claude/settings.json"), "{PRIVATE_HOST_CONFIG");
   const result = await runDoctor(ctx, ctx.execution);
   expect(result.usable).toBe(true);

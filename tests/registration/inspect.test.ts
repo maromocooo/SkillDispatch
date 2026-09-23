@@ -123,25 +123,30 @@ describe.each(["codex", "claude"] as const)(
       const env = {
         [host === "codex" ? "CODEX_HOME" : "CLAUDE_CONFIG_DIR"]: ctx.repo,
       };
-      expect(
-        (await inspectRegistration(host, { ...ctx, env }, execution)).issues,
-      ).toContain("custom_host_directory_manual_action_required");
+      const status = await inspectRegistration(
+        host,
+        { ...ctx, env },
+        execution,
+      );
+      if (host === "claude")
+        expect(status.issues).toContain(
+          "custom_host_directory_manual_action_required",
+        );
+      else expect(status.registration).toBe("not-installed");
     });
   },
 );
 describe("Codex inline hook conflicts", () => {
-  it.each([
-    "[hooks]\n",
-    "hooks = {}",
-    "[[hooks.UserPromptSubmit]]\n",
-    "hooks.UserPromptSubmit = []",
-  ])("detects TOML hooks with %s", async (toml) => {
-    const ctx = await workspace();
-    await write(join(ctx.home, ".codex/config.toml"), toml);
-    expect((await inspectRegistration("codex", ctx, execution)).issues).toEqual(
-      ["codex_inline_hooks_manual_action_required"],
-    );
-  });
+  it.each(["[[hooks.UserPromptSubmit]]\n", "hooks.UserPromptSubmit = []"])(
+    "detects TOML hooks with %s",
+    async (toml) => {
+      const ctx = await workspace();
+      await write(join(ctx.home, ".codex/config.toml"), toml);
+      expect(
+        (await inspectRegistration("codex", ctx, execution)).issues,
+      ).toEqual(["codex_inline_hooks_manual_action_required"]);
+    },
+  );
   it("does not confuse comments/quoted strings/nested keys with top-level hooks", async () => {
     const ctx = await workspace();
     await write(

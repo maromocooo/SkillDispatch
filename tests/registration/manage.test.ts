@@ -329,7 +329,7 @@ it("Codex inline hooks refuse installation without rewriting TOML or JSON; unins
   const before = await readFile(ctx.path, "utf8");
   await write(
     join(ctx.home, ".codex/config.toml"),
-    "[hooks]\n# PRIVATE_TOML\n",
+    '[[hooks.PreToolUse]]\nmatcher = "Bash"\n[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "PRIVATE_TOML"\n',
   );
   await expect(ctx.manage("install")).rejects.toThrow(
     "codex_inline_hooks_manual_action_required",
@@ -337,7 +337,7 @@ it("Codex inline hooks refuse installation without rewriting TOML or JSON; unins
   expect(await readFile(ctx.path, "utf8")).toBe(before);
   await ctx.manage("uninstall");
   expect(await readFile(join(ctx.home, ".codex/config.toml"), "utf8")).toBe(
-    "[hooks]\n# PRIVATE_TOML\n",
+    '[[hooks.PreToolUse]]\nmatcher = "Bash"\n[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "PRIVATE_TOML"\n',
   );
 });
 it("external config edits abort atomic replacement", async () => {

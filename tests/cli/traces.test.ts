@@ -87,7 +87,7 @@ describe("operational trace CLI", () => {
           "PRIVATE_SDK_ERROR",
         ])
           expect(result.stdout).not.toContain(forbidden);
-        if (flag.length) expect(JSON.parse(result.stdout).version).toBe(1);
+        if (flag.length) expect(JSON.parse(result.stdout).version).toBe(2);
       }
       expect(fetch).not.toHaveBeenCalled();
       expect(await readFile(path)).toEqual(before);
@@ -225,6 +225,7 @@ describe("operational trace CLI", () => {
       "totalLines",
       "validTraces",
       "invalidLines",
+      "unsupportedVersions",
       "matchedTraces",
       "traces",
     ]);

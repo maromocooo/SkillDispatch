@@ -4,7 +4,10 @@ import { z } from "zod";
 import { catalogFingerprint } from "../../src/telemetry/fingerprint.js";
 import { keyedHash } from "../../src/telemetry/privacy.js";
 import { createRouteTrace } from "../../src/telemetry/trace.js";
-import { routeTraceSchema } from "../../src/telemetry/types.js";
+import {
+  routeTraceSchema,
+  routeTraceV1Schema,
+} from "../../src/telemetry/types.js";
 import {
   digest,
   schemaValidator,
@@ -118,13 +121,13 @@ describe("route trace v1 privacy and schema", () => {
       ),
     );
     expect(shipped).toEqual(
-      z.toJSONSchema(routeTraceSchema, { target: "draft-2020-12" }),
+      z.toJSONSchema(routeTraceV1Schema, { target: "draft-2020-12" }),
     );
   });
   it.each([
     { cwd: "/private" },
     { mode: "enforce" },
-    { schemaVersion: "2.0" },
+    { schemaVersion: "99.0" },
     { prompt: { storage: "none", hash: digest("x") } },
     { prompt: { storage: "hash", raw: "private" } },
     {

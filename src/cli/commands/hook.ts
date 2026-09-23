@@ -3,6 +3,7 @@ import { parseClaudeInput } from "../../hooks/claude.js";
 import { parseCodexInput } from "../../hooks/codex.js";
 import { runHook } from "../../hooks/runtime.js";
 import { readHookJson } from "../../hooks/stdin.js";
+import { codexReadPersistenceReady } from "../../observability/codex-read-storage.js";
 import { invocationPersistenceReady } from "../../observability/readiness.js";
 import { resolveExecution } from "../../registration/command.js";
 import {
@@ -25,23 +26,24 @@ export async function hookCommand(
     if (input) {
       const output = await runHook(input, environment, {
         invocationObserverConfigured: async () => {
-          if (host !== "claude" || !environment.execution) return false;
+          if (!environment.execution) return false;
           const execution = await resolveExecution(environment.execution);
           const status = await inspectRegistration(
-            "claude",
+            host,
             environment,
             execution,
           );
-          return (
-            status.skillObservers?.ready === true &&
-            (await invocationPersistenceReady(environment))
-          );
+          return host === "codex"
+            ? status.instructionObservers?.ready === true &&
+                (await codexReadPersistenceReady(environment))
+            : status.skillObservers?.ready === true &&
+                (await invocationPersistenceReady(environment));
         },
         canAdvise: async () => {
           if (!environment.execution) return false;
           const execution = await resolveExecution(environment.execution);
           const status = await inspectRegistration(
-            "claude",
+            host,
             environment,
             execution,
           );

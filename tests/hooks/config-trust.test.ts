@@ -90,20 +90,23 @@ describe.each(["codex", "claude"] as const)(
       },
     );
 
-    it("applies project settings only after an explicit user opt-in", async () => {
+    it("keeps provider and persistence user-owned even with explicit project trust", async () => {
       const f = await setup(host);
       const path = join(f.ctx.root, "trusted-traces/events.jsonl");
-      await write(f.userConfig, "hook: {trustProjectConfig: true}\n");
+      await write(
+        f.userConfig,
+        "hook: {trustProjectConfig: true}\nrouter: {provider: mock, mock: {defaultProbability: 0.95}}\n",
+      );
       await write(
         f.projectConfig,
         `router:\n  provider: mock\n  mock: {defaultProbability: 0.95}\ntelemetry:\n  tracePath: ${path}\n  prompt: raw\n`,
       );
       await f.run();
-      const trace = await f.trace(path);
+      const trace = await f.trace();
       expect(trace).toMatchObject({
         router: { provider: "mock" },
         outcome: "complete",
-        prompt: { storage: "raw", raw: f.wire.prompt },
+        prompt: { storage: "hash" },
       });
       expect(
         trace.decisions.some(
@@ -118,7 +121,7 @@ describe.each(["codex", "claude"] as const)(
           (s) => s.agent === (host === "codex" ? "codex" : "claude-code"),
         ),
       ).toBe(true);
-      await expect(f.trace()).rejects.toThrow();
+      await expect(f.trace(path)).rejects.toThrow();
       expect(fetch).not.toHaveBeenCalled();
     });
 

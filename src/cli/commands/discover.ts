@@ -3,6 +3,10 @@ import {
   claudeOriginCounts,
 } from "../../discovery/claude-origin.js";
 import {
+  codexMetadata,
+  codexOriginCounts,
+} from "../../discovery/codex-origin.js";
+import {
   type CliEnvironment,
   type CliOptions,
   discoverForCommand,
@@ -19,6 +23,7 @@ export async function discoverCommand(
     discovered: catalog.skills.length,
     modelRoutable: catalog.skills.filter((s) => s.enabled).length,
     claudeOrigins: claudeOriginCounts(catalog.skills),
+    codexOrigins: codexOriginCounts(catalog.skills),
   };
   if (options.json) {
     io.stdout(`${JSON.stringify({ ...catalog, summary }, null, 2)}\n`);
@@ -29,9 +34,16 @@ export async function discoverCommand(
   );
   for (const skill of catalog.skills)
     io.stdout(
-      `${terminalText(skill.name)}\t${skill.agent}\t${skill.scope}\t${skill.enabled ? "enabled" : "disabled"}\t${terminalText(skill.path)}${claudeMetadata(skill) ? `\t${claudeMetadata(skill)?.origin}` : ""}\n`,
+      `${terminalText(skill.name)}\t${skill.agent}\t${skill.scope}\t${skill.enabled ? "enabled" : "disabled"}\t${terminalText(skill.path)}${codexMetadata(skill) ? `\t${codexMetadata(skill)?.origin} (session unconfirmed)` : ""}${claudeMetadata(skill) ? `\t${claudeMetadata(skill)?.origin}` : ""}\n`,
     );
-  for (const [origin, counts] of Object.entries(summary.claudeOrigins)) {
+  for (const [origin, counts] of Object.entries({
+    ...Object.fromEntries(
+      Object.entries(summary.claudeOrigins).map(([k, v]) => [k, v]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(summary.codexOrigins).map(([k, v]) => [`Codex ${k}`, v]),
+    ),
+  })) {
     if (counts.discovered)
       io.stdout(
         `Origin ${origin}: ${counts.discovered} discovered, ${counts.modelRoutable} model-routable\n`,

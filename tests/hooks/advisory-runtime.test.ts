@@ -302,7 +302,7 @@ describe("mode-aware shared runtime", () => {
         throw new Error("PRIVATE_FAILURE");
       };
       if (failure === "invalid_config")
-        await write(f.configPath, "hook: {modes: {codex: advisory}}");
+        await write(f.configPath, "hook: {modes: {codex: enforce}}");
       if (failure === "disabled")
         await write(
           f.configPath,

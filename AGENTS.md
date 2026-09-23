@@ -16,8 +16,9 @@ Read [README](README.md), [architecture](docs/ARCHITECTURE.md),
   multi-skill selection is first-class, including an empty selection.
 - Discovery is read-only and adapter-based. A file on disk is not automatically
   model-routable. Respect native identity, eligibility and documented scope limits.
-- Codex is shadow-only. Claude advisory requires explicit user-owned configuration
-  and a synchronous registration. Do not expand runtime modes without an agreed scope.
+- Advisory requires explicit user-owned configuration and synchronous registration.
+  Codex additionally requires a supported target contract. Keep Codex instruction-read
+  evidence separate from Claude native invocation; Post does not imply success.
 
 ## Safety and privacy
 

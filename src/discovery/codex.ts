@@ -1,14 +1,16 @@
-import { isAbsolute, join, resolve } from "node:path";
-import { parse as parseToml } from "smol-toml";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { parseDocument } from "yaml";
 import { z } from "zod";
-import type { Diagnostic } from "../core/types.js";
 import { finalizeCatalog } from "./catalog.js";
 import {
-  canonicalPath,
-  projectDirectories,
-  readOptional,
-} from "./filesystem.js";
+  type CodexSkillMetadata,
+  codexCatalogIdentity,
+  codexMetadata,
+  safeCodexName,
+} from "./codex-origin.js";
+import { discoverCodexPlugins } from "./codex-plugins.js";
+import { codexHome, loadCodexSettings } from "./codex-settings.js";
+import { projectDirectories, readOptional } from "./filesystem.js";
 import { scanSources } from "./scan.js";
 import type {
   DiscoveryAdapter,
@@ -16,25 +18,21 @@ import type {
   DiscoverySource,
 } from "./types.js";
 
-const configSchema = z.object({
-  skills: z
-    .object({
-      config: z
-        .array(z.object({ path: z.string().min(1), enabled: z.boolean() }))
-        .optional(),
-    })
-    .optional(),
-});
 const policySchema = z.object({
   policy: z
-    .object({ allow_implicit_invocation: z.boolean().optional() })
+    .object({
+      allow_implicit_invocation: z.boolean().optional(),
+      products: z.array(z.string()).optional(),
+    })
     .optional(),
 });
 
 export interface CodexDiscoveryOptions {
+  /** Observer-only exact-file lookup, without traversing unrelated skill subtrees. */
+  targetPath?: string;
   /** Overrides the default /etc/codex/skills source; [] disables admin scanning. */
   adminRoots?: readonly string[];
-  /** Bundled skill paths are installation-specific and must be supplied explicitly. */
+  /** Additional system roots; the CODEX_HOME .system root is always included. */
   systemRoots?: readonly string[];
 }
 
@@ -44,13 +42,22 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
 
   async discover(context: DiscoveryContext) {
     const directories = await projectDirectories(context.cwd);
+    const home = codexHome(context);
+    const adminRoots = this.options.adminRoots ?? ["/etc/codex/skills"];
+    const settings = await loadCodexSettings(context, directories, adminRoots);
     const sources: DiscoverySource[] = [
       ...directories.map((directory) => ({
         path: join(directory, ".agents/skills"),
         scope: "repo" as const,
       })),
       { path: join(context.home, ".agents/skills"), scope: "user" },
-      ...(this.options.adminRoots ?? ["/etc/codex/skills"]).map((path) => ({
+      ...settings.trustedDirectories.map((directory) => ({
+        path: join(directory, ".codex/skills"),
+        scope: "repo" as const,
+      })),
+      { path: join(home, "skills/.system"), scope: "system" },
+      { path: join(home, "skills"), scope: "user" },
+      ...adminRoots.map((path) => ({
         path: resolve(path),
         scope: "admin" as const,
       })),
@@ -59,14 +66,67 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
         scope: "system" as const,
       })),
     ];
-    const result = await scanSources(this.agent, sources, { recursive: true });
-    const configPath = join(
-      context.env?.CODEX_HOME || join(context.home, ".codex"),
-      "config.toml",
+    const result = await scanSources(this.agent, sources, {
+      recursive: true,
+      ...(this.options.targetPath
+        ? { targetPath: this.options.targetPath }
+        : {}),
+    });
+    for (const skill of result.skills) delete skill.metadata.codex;
+    const plugins = await discoverCodexPlugins(
+      home,
+      settings.plugins,
+      settings.valid && settings.pluginsValid,
+      this.options.targetPath,
     );
-    const disabled = await disabledPaths(configPath, result.diagnostics);
+    result.skills.unshift(...plugins.skills);
+    result.diagnostics.push(...settings.diagnostics, ...plugins.diagnostics);
+    const unique = finalizeCatalog([result]);
+    result.skills = unique.skills;
     for (const skill of result.skills) {
-      if (disabled.has(skill.path)) {
+      let configuredEnabled = true;
+      for (const rule of settings.rules)
+        if (rule.path === skill.path || rule.name === skill.name)
+          configuredEnabled = rule.enabled;
+      const metadata =
+        codexMetadata(skill) ??
+        ({
+          origin:
+            skill.scope === "repo"
+              ? "local-project"
+              : skill.scope === "system"
+                ? "system"
+                : skill.scope === "admin"
+                  ? "admin"
+                  : "local-user",
+          nativeName: skill.name,
+          configuredEnabled,
+          modelInvocable: true,
+          sessionAvailability: "unconfirmed",
+        } satisfies CodexSkillMetadata);
+      const inCache = relative(join(home, "plugins/cache"), skill.path);
+      if (
+        metadata.origin !== "plugin" &&
+        !inCache.startsWith("..") &&
+        !isAbsolute(inCache)
+      ) {
+        configuredEnabled = false;
+        result.diagnostics.push({
+          code: "codex_plugin_alias_unresolved",
+          level: "warning",
+          message:
+            "Plugin alias excluded without verified owning installation.",
+        });
+      }
+      metadata.configuredEnabled = configuredEnabled;
+      skill.metadata.codex = metadata;
+      if (
+        !settings.valid ||
+        !settings.includeInstructions ||
+        !configuredEnabled ||
+        (skill.scope === "system" && !settings.bundled) ||
+        !safeCodexName(skill.name)
+      ) {
         skill.enabled = false;
         skill.metadata.disabledReason = "codex_config";
       }
@@ -80,7 +140,10 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
           const parsed = policySchema.parse(
             document.toJS({ maxAliasCount: 20 }),
           );
-          if (parsed.policy?.allow_implicit_invocation === false) {
+          if (
+            parsed.policy?.allow_implicit_invocation === false ||
+            parsed.policy?.products?.length
+          ) {
             skill.enabled = false;
             skill.metadata.disabledReason = "explicit_invocation_only";
           }
@@ -99,42 +162,9 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
         skill.enabled = false;
         skill.metadata.disabledReason = "unreadable_invocation_policy";
       }
+      metadata.modelInvocable = skill.enabled;
+      skill.metadata.catalogIdentity = codexCatalogIdentity(skill);
     }
     return finalizeCatalog([result]);
   }
-}
-
-async function disabledPaths(
-  path: string,
-  diagnostics: Diagnostic[],
-): Promise<Set<string>> {
-  const disabled = new Set<string>();
-  const content = await readOptional(path, diagnostics);
-  if (content === undefined) return disabled;
-  try {
-    const config = configSchema.parse(parseToml(content));
-    for (const entry of config.skills?.config ?? []) {
-      if (!isAbsolute(entry.path)) {
-        diagnostics.push({
-          code: "invalid_disabled_path",
-          level: "warning",
-          message:
-            "Codex skill configuration requires an absolute SKILL.md path.",
-          path,
-        });
-        continue;
-      }
-      const canonical = await canonicalPath(entry.path);
-      if (entry.enabled) disabled.delete(canonical);
-      else disabled.add(canonical);
-    }
-  } catch {
-    diagnostics.push({
-      code: "invalid_codex_config",
-      level: "warning",
-      message: "Cannot read disabled skills from Codex configuration.",
-      path,
-    });
-  }
-  return disabled;
 }

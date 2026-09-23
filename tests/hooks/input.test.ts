@@ -21,8 +21,7 @@ describe.each(["codex", "claude"] as const)("%s hook input", (host) => {
     const input = parse({
       ...raw,
       unknown_future: { secret: true },
-      agent_id: "id",
-      agent_type: "custom",
+      ...(host === "claude" ? { agent_id: "id", agent_type: "custom" } : {}),
       permission_mode: "future-mode",
     });
     expect(input).toMatchObject({

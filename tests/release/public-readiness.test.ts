@@ -71,7 +71,7 @@ describe("public release artifacts", () => {
       bin: { skilldispatch: "dist/cli/index.js" },
       publishConfig: { access: "public" },
     });
-    expect(api.VERSION).toBe("0.1.0");
+    expect(api.VERSION).toBe("0.2.0");
     expect(Object.keys(api).sort()).toEqual(
       [
         "VERSION",

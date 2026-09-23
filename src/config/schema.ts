@@ -19,7 +19,7 @@ export const maxSkillsSchema = z
 
 export const hookModesSchema = z.object({
   claude: z.enum(["shadow", "advisory"]),
-  codex: z.literal("shadow"),
+  codex: z.enum(["shadow", "advisory"]),
 });
 export type HookModes = z.infer<typeof hookModesSchema>;
 
@@ -27,6 +27,7 @@ export const configFileSchema = z.object({
   hook: z
     .object({
       trustProjectConfig: z.boolean().optional(),
+      codexContract: z.string().max(64).optional(),
       modes: hookModesSchema.partial().optional(),
     })
     .optional(),
@@ -69,7 +70,11 @@ export const configFileSchema = z.object({
 });
 
 export interface SkillDispatchConfig {
-  hook: { trustProjectConfig: boolean; modes: HookModes };
+  hook: {
+    trustProjectConfig: boolean;
+    modes: HookModes;
+    codexContract?: string;
+  };
   telemetry: {
     enabled: boolean;
     prompt: "none" | "hash" | "raw";

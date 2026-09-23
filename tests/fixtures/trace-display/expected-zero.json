@@ -1,8 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "totalLines": 5,
   "validTraces": 4,
   "invalidLines": 1,
+  "unsupportedVersions": 0,
   "matchedTraces": 4,
   "trace": {
     "traceId": "00000000-0000-4000-8000-000000000002",

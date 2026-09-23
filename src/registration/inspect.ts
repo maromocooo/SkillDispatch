@@ -1,10 +1,18 @@
 import { isAbsolute, join, resolve } from "node:path";
-import { parse as parseToml } from "smol-toml";
+import {
+  codexReadEvents,
+  supportedCodexContract,
+} from "../hosts/codex-contract.js";
 import { invocationEvents } from "../observability/invocation-types.js";
-import { shadowCommand, skillObserverCommand } from "./command.js";
+import { codexHookDisabled, readCodexHookState } from "./codex-state.js";
+import {
+  codexObserverCommand,
+  shadowCommand,
+  skillObserverCommand,
+} from "./command.js";
 import { HookDocument, ownsHandler, possibleOtherInstall } from "./document.js";
 import { readHostFile } from "./files.js";
-import { registrationMode } from "./mode.js";
+import { codexContract, registrationMode } from "./mode.js";
 import {
   type CliExecution,
   type HookStatus,
@@ -16,12 +24,17 @@ import {
 export function hostPaths(host: Host, environment: RegistrationEnvironment) {
   if (!isAbsolute(environment.home))
     throw new RegistrationError("invalid_user_home");
-  const directory = join(
+  let directory = join(
     environment.home,
     host === "codex" ? ".codex" : ".claude",
   );
   const override =
     environment.env[host === "codex" ? "CODEX_HOME" : "CLAUDE_CONFIG_DIR"];
+  if (host === "codex" && override) {
+    if (!isAbsolute(override))
+      throw new RegistrationError("invalid_host_directory");
+    directory = resolve(override);
+  }
   if (override && resolve(override) !== resolve(directory))
     throw new RegistrationError("custom_host_directory_manual_action_required");
   return {
@@ -31,18 +44,7 @@ export function hostPaths(host: Host, environment: RegistrationEnvironment) {
   };
 }
 export async function checkCodexInline(path: string) {
-  const file = await readHostFile(path);
-  if (!file) return;
-  let parsed: object;
-  try {
-    parsed = parseToml(
-      new TextDecoder("utf8", { fatal: true }).decode(file.bytes),
-    );
-  } catch {
-    throw new RegistrationError("malformed_codex_toml");
-  }
-  if (Object.hasOwn(parsed, "hooks"))
-    throw new RegistrationError("codex_inline_hooks_manual_action_required");
+  return readCodexHookState(path);
 }
 export async function loadRegistration(
   host: Host,
@@ -50,7 +52,10 @@ export async function loadRegistration(
   checkInline = true,
 ) {
   const paths = hostPaths(host, environment);
-  if (host === "codex" && checkInline) await checkCodexInline(paths.toml);
+  const codexState =
+    host === "codex" && checkInline
+      ? await checkCodexInline(paths.toml)
+      : new Map<string, boolean | undefined>();
   const snapshot = await readHostFile(paths.config);
   let text: string;
   try {
@@ -60,7 +65,7 @@ export async function loadRegistration(
   } catch {
     throw new RegistrationError("malformed_host_json");
   }
-  return { paths, snapshot, document: new HookDocument(text) };
+  return { paths, snapshot, document: new HookDocument(text), codexState };
 }
 export async function inspectRegistration(
   host: Host,
@@ -82,7 +87,10 @@ export async function inspectRegistration(
   try {
     status.mode = await registrationMode(host, environment);
     status.expectedExecution = status.mode === "advisory" ? "sync" : "async";
-    const { document } = await loadRegistration(host, environment);
+    const { document, paths, codexState } = await loadRegistration(
+      host,
+      environment,
+    );
     if (!execution) throw new RegistrationError("cli_identity_unavailable");
     const command = shadowCommand(host, execution);
     const matching = document
@@ -118,60 +126,106 @@ export async function inspectRegistration(
     )
       status.issues.push("modified_registration_manual_action_required");
     if (status.issues.length) status.registration = "conflict";
+    if (
+      host === "codex" &&
+      matching.some((handler) =>
+        codexHookDisabled(
+          codexState,
+          paths.config,
+          "UserPromptSubmit",
+          handler,
+        ),
+      )
+    )
+      status.issues.push("codex_hook_disabled_by_host");
     if (host === "claude" && document.node(["disableAllHooks"])?.value === true)
       status.issues.push("host_hooks_disabled");
     if (matching.length && status.execution !== status.expectedExecution)
       status.issues.push("hook_execution_mismatch");
-    if (host === "claude") {
-      const observer = skillObserverCommand(execution);
-      const events = invocationEvents.map((event) => {
-        const owned = document
-          .handlers(event)
-          .filter((h) => ownsHandler(h.value, observer));
-        const first = owned[0];
-        const conflict =
-          owned.length > 1 ||
-          owned.some(
-            (h) =>
-              h.matcher !== "Skill" ||
-              h.value.asyncRewake === true ||
-              h.value.if !== undefined ||
-              (h.value.async !== undefined &&
-                typeof h.value.async !== "boolean"),
-          ) ||
-          document
+    {
+      const isCodex = host === "codex";
+      const observer = isCodex
+        ? codexObserverCommand(execution)
+        : skillObserverCommand(execution);
+      const matcher = isCodex ? "Bash" : "Skill";
+      const events = (isCodex ? codexReadEvents : invocationEvents).map(
+        (event) => {
+          const owned = document
             .handlers(event)
-            .some(
-              (h) =>
-                !ownsHandler(h.value, observer) &&
-                possibleOtherInstall(h.value, host),
+            .filter((h) => ownsHandler(h.value, observer));
+          const first = owned[0];
+          const disabled =
+            isCodex &&
+            owned.some((handler) =>
+              codexHookDisabled(codexState, paths.config, event, handler),
             );
-        return {
-          event,
-          matcher: "Skill" as const,
-          registration: conflict
-            ? ("conflict" as const)
-            : first
-              ? ("installed" as const)
-              : ("not-installed" as const),
-          execution: first
-            ? first.value.async === true
-              ? ("async" as const)
-              : ("sync" as const)
-            : null,
-          registrations: owned.length,
-        };
-      });
-      status.skillObservers = {
+          if (disabled)
+            status.issues.push(
+              event === "PreToolUse"
+                ? "codex_pre_tool_use_disabled_by_host"
+                : "codex_post_tool_use_disabled_by_host",
+            );
+          const conflict =
+            disabled ||
+            owned.length > 1 ||
+            owned.some(
+              (h) =>
+                h.matcher !== matcher ||
+                h.value.asyncRewake === true ||
+                h.value.if !== undefined ||
+                (h.value.async !== undefined &&
+                  typeof h.value.async !== "boolean"),
+            ) ||
+            document
+              .handlers(event)
+              .some(
+                (h) =>
+                  !ownsHandler(h.value, observer) &&
+                  possibleOtherInstall(h.value, host),
+              );
+          return {
+            event,
+            matcher,
+            registration: conflict
+              ? ("conflict" as const)
+              : first
+                ? ("installed" as const)
+                : ("not-installed" as const),
+            execution: first
+              ? first.value.async === true
+                ? ("async" as const)
+                : ("sync" as const)
+              : null,
+            registrations: owned.length,
+          };
+        },
+      );
+      const observers = {
         ready:
+          (!isCodex ||
+            supportedCodexContract(await codexContract(environment))) &&
           document.node(["disableAllHooks"])?.value !== true &&
           events.every(
             (e) => e.registration === "installed" && e.execution === "async",
           ),
         events,
       };
-      if (!status.skillObservers.ready)
-        status.issues.push("skill_invocation_telemetry_incomplete");
+      if (isCodex) {
+        status.instructionObservers = observers;
+        status.codexContract = supportedCodexContract(
+          await codexContract(environment),
+        )
+          ? "source-verified-user-target"
+          : "unverified";
+        if (status.codexContract === "unverified")
+          status.issues.push("codex_contract_unverified");
+      } else status.skillObservers = observers;
+      if (!observers.ready)
+        status.issues.push(
+          isCodex
+            ? "skill_instruction_telemetry_incomplete"
+            : "skill_invocation_telemetry_incomplete",
+        );
     }
     if (host === "codex" && matching.length)
       status.issues.push("codex_host_trust_not_verified");
@@ -189,6 +243,11 @@ export async function inspectRegistration(
 /** Observer readiness is independent of same-turn advisory readiness. */
 export function routingRegistrationIssues(status: HookStatus): string[] {
   return status.issues.filter(
-    (code) => code !== "skill_invocation_telemetry_incomplete",
+    (code) =>
+      code !== "skill_invocation_telemetry_incomplete" &&
+      code !== "skill_instruction_telemetry_incomplete" &&
+      code !== "codex_pre_tool_use_disabled_by_host" &&
+      code !== "codex_post_tool_use_disabled_by_host" &&
+      code !== "codex_host_trust_not_verified",
   );
 }

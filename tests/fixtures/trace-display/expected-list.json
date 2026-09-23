@@ -1,8 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "totalLines": 5,
   "validTraces": 4,
   "invalidLines": 1,
+  "unsupportedVersions": 0,
   "matchedTraces": 4,
   "traces": [
     {

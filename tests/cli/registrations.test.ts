@@ -60,7 +60,21 @@ describe("hooks CLI", () => {
           execution: null,
           command: null,
           configSource: "~/.codex/hooks.json",
-          issues: [],
+          issues: [
+            "codex_contract_unverified",
+            "skill_instruction_telemetry_incomplete",
+          ],
+          codexContract: "unverified",
+          instructionObservers: {
+            ready: false,
+            events: ["PreToolUse", "PostToolUse"].map((event) => ({
+              event,
+              matcher: "Bash",
+              registration: "not-installed",
+              execution: null,
+              registrations: 0,
+            })),
+          },
           registrations: 0,
         },
         {
@@ -138,7 +152,8 @@ describe("hooks CLI", () => {
   it("inline conflict returns exit 1 with safe reason, without mutation", async () => {
     const ctx = await fixture();
     const path = join(ctx.home, ".codex/config.toml");
-    const text = "[hooks]\n# PRIVATE_TOML_SECRET\n";
+    const text =
+      '[[hooks.PreToolUse]]\nmatcher = "Bash"\n[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "PRIVATE_TOML_SECRET"\n';
     await write(path, text);
     const status = await run(["hooks", "status", "codex", "--json"], ctx);
     expect(status.exit).toBe(1);

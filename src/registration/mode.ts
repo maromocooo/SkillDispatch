@@ -22,3 +22,12 @@ export async function registrationMode(
     throw new RegistrationError("invalid_user_hook_mode_config");
   }
 }
+
+export async function codexContract(environment: RegistrationEnvironment) {
+  const { config } = await loadConfig({
+    home: environment.home,
+    cwd: environment.home,
+    mode: "user",
+  });
+  return config.hook.codexContract;
+}

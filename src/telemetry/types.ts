@@ -8,7 +8,7 @@ export const diagnosticCodeSchema = z.string().regex(/^[a-z][a-z0-9_]{0,127}$/);
 export const promptStorageSchema = z.enum(["none", "hash", "raw"]);
 export type PromptStorage = z.infer<typeof promptStorageSchema>;
 
-export const routeTraceSchema = z
+export const routeTraceV1Schema = z
   .strictObject({
     schemaVersion: z.literal("1.0"),
     traceId: z.uuid(),
@@ -100,6 +100,36 @@ export const routeTraceSchema = z
       "Local routing recommendations and optional advisory delivery. No host invocation or output quality is inferred.",
   });
 
+/** New Codex wire format. The published v1 schema stays unchanged. */
+export const routeTraceV2Schema = routeTraceV1Schema
+  .extend({
+    schemaVersion: z.literal("2.0"),
+    agent: z.literal("codex"),
+    capabilities: z
+      .strictObject({
+        skillInvocationTelemetry: z.never().optional(),
+        skillInstructionReadTelemetry: z.literal(true).optional(),
+      })
+      .optional(),
+    delivery: z
+      .strictObject({
+        kind: z.enum(["none", "codex-advisory"]),
+        injectedSkillIds: z.array(digestSchema),
+      })
+      .optional(),
+  })
+  .meta({
+    $id: "https://skilldispatch.dev/schemas/route-trace-v2.json",
+    title: "SkillDispatch Route Trace v2",
+    description:
+      "Codex routing and emitted context. Observer configuration is not delivery or completeness.",
+  });
+export const routeTraceSchema = z.union([
+  routeTraceV1Schema,
+  routeTraceV2Schema,
+]);
+
+export type RouteTraceV1 = z.infer<typeof routeTraceV1Schema>;
 export type RouteTrace = z.infer<typeof routeTraceSchema>;
 export interface TraceSink {
   write(trace: RouteTrace): Promise<void>;

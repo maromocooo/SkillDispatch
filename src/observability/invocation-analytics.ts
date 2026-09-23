@@ -28,10 +28,15 @@ export async function readInvocationIndex(reader: InvocationEventReader) {
   const calls = new Map<string, Lifecycle>();
   let validEvents = 0,
     invalidLines = 0,
+    unsupportedVersions = 0,
     duplicates = 0,
     available = true;
   try {
     for await (const item of reader.read()) {
+      if (item.kind === "unsupported") {
+        unsupportedVersions++;
+        continue;
+      }
       if (item.kind === "invalid") {
         invalidLines++;
         continue;
@@ -101,6 +106,7 @@ export async function readInvocationIndex(reader: InvocationEventReader) {
       available,
       validEvents,
       invalidLines,
+      unsupportedVersions,
       duplicates,
       attempted,
       succeeded,

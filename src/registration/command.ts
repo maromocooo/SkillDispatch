@@ -27,6 +27,7 @@ const powershellQuote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export function shadowCommand(
   host: Host,
   execution: CliExecution,
+  entry: string = host,
 ): CommandSpec {
   const absolute =
     execution.platform === "win32" ? win32.isAbsolute : isAbsolute;
@@ -38,7 +39,7 @@ export function shadowCommand(
     )
       throw new RegistrationError("unsupported_executable_path");
   }
-  const args = [execution.cliPath, "hook", host];
+  const args = [execution.cliPath, "hook", entry];
   if (host === "claude") return { command: execution.nodePath, args };
   const argv = [execution.nodePath, ...args];
   if (execution.platform === "win32") {
@@ -59,3 +60,6 @@ export function skillObserverCommand(execution: CliExecution): CommandSpec {
     args: [execution.cliPath, "hook", "claude-skill"],
   };
 }
+
+export const codexObserverCommand = (execution: CliExecution) =>
+  shadowCommand("codex", execution, "codex-read");

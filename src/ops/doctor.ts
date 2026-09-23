@@ -5,7 +5,12 @@ import { loadConfig } from "../config/load.js";
 import { ClaudeDiscoveryAdapter } from "../discovery/claude.js";
 import { claudeOriginCounts } from "../discovery/claude-origin.js";
 import { CodexDiscoveryAdapter } from "../discovery/codex.js";
+import { codexOriginCounts } from "../discovery/codex-origin.js";
 import { isMissing } from "../discovery/filesystem.js";
+import {
+  codexReadPath,
+  codexReadPersistenceReady,
+} from "../observability/codex-read-storage.js";
 import { invocationPersistenceReady } from "../observability/readiness.js";
 import { validateApiKey } from "../providers/jev/options.js";
 import { resolveExecution } from "../registration/command.js";
@@ -111,10 +116,12 @@ export async function runDoctor(
       /* Report unavailable identity below. */
     }
   }
+  let codexRegistration: HookStatus | undefined;
   let claudeRegistration: HookStatus | undefined;
   for (const host of hosts) {
     const registration = await inspectRegistration(host, environment, resolved);
     if (host === "claude") claudeRegistration = registration;
+    else codexRegistration = registration;
     add(
       `hook_${host}`,
       registration.registration === "installed" && !registration.issues.length
@@ -124,6 +131,23 @@ export async function runDoctor(
       registration.registration,
     );
   }
+  const readReady =
+    codexRegistration?.instructionObservers?.ready === true &&
+    (await codexReadPersistenceReady(environment));
+  add(
+    "codex_instruction_read_telemetry_ready",
+    readReady ? "PASS" : "WARN",
+    "Local instruction-read observers/storage only; target contract is user-declared, host version, trust, reload and delivery need user verification.",
+    readReady,
+  );
+  add(
+    "codex_host_contract",
+    codexRegistration?.codexContract === "source-verified-user-target"
+      ? "PASS"
+      : "WARN",
+    "No live host capability probe or automatic trust approval performed.",
+    codexRegistration?.codexContract ?? "unverified",
+  );
   const invocationReady =
     claudeRegistration?.skillObservers?.ready === true &&
     (await invocationPersistenceReady(environment));
@@ -217,6 +241,19 @@ export async function runDoctor(
     "Local routing prerequisites only; does not verify online authentication, host registration/trust or delivery.",
     routingReady,
   );
+  const codexMode = config.hook.modes.codex;
+  const codexReady =
+    codexMode === "advisory" &&
+    routingReady &&
+    codexRegistration?.registration === "installed" &&
+    codexRegistration.execution === "sync" &&
+    !routingRegistrationIssues(codexRegistration).length;
+  add(
+    "codex_advisory_ready",
+    codexMode === "shadow" || codexReady ? "PASS" : "WARN",
+    "Local prerequisites only. Configure a supported Codex target contract, reinstall and review/trust hooks in the target host.",
+    codexReady,
+  );
   const claudeMode = config.hook.modes.claude;
   const executionMatches =
     claudeRegistration?.registration === "installed" &&
@@ -259,6 +296,18 @@ export async function runDoctor(
         `Discovered ${catalog.skills.length} skills, ${catalog.skills.filter((s) => s.enabled).length} enabled, ${catalog.diagnostics.length} diagnostics. Paths/messages withheld.`,
         catalog.skills.length,
       );
+      if (adapter.agent === "codex")
+        for (const [origin, count] of Object.entries(
+          codexOriginCounts(catalog.skills),
+        )) {
+          if (count.discovered)
+            add(
+              `codex_origin_${origin.replaceAll("-", "_")}`,
+              "PASS",
+              `${origin}: ${count.discovered} discovered, ${count.modelRoutable} model-routable; session availability unconfirmed.`,
+              count.discovered,
+            );
+        }
       if (adapter.agent === "claude-code") {
         for (const [origin, counts] of Object.entries(
           claudeOriginCounts(catalog.skills),
@@ -362,6 +411,8 @@ export async function runDoctor(
   try {
     const reserved = [
       keyPath,
+      codexReadPath(environment),
+      join(directory, "invocations.jsonl"),
       join(environment.home, ".config/skilldispatch/config.yaml"),
     ];
     await assertTraceDestination(path, reserved);
@@ -386,15 +437,17 @@ export async function runDoctor(
       path,
     );
     let valid = 0,
-      invalid = 0;
+      invalid = 0,
+      unsupported = 0;
     for await (const item of new JsonlTraceReader(path, reserved).read()) {
       if (item.kind === "valid") valid++;
+      else if (item.kind === "unsupported") unsupported++;
       else invalid++;
     }
     add(
       "trace_health",
-      invalid ? "WARN" : "PASS",
-      `Valid traces: ${valid}; invalid lines: ${invalid}.`,
+      invalid || unsupported ? "WARN" : "PASS",
+      `Valid traces: ${valid}; invalid lines: ${invalid}; unsupported versions: ${unsupported}.`,
     );
     add("valid_traces", "PASS", "Validated trace count.", valid);
     add(
