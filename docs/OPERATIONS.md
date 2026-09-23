@@ -189,15 +189,17 @@ Boundaries and limitations:
   Traversal stops at a skill boundary, skips hidden child directories and
   `node_modules`, and is bounded to depth 32 / 10,000 directories. Files are
   limited to regular files of at most 1 MiB. Invalid files and traversal failures become diagnostics.
-- Codex system roots are explicit library options because installation paths
-  vary. Plugin caches and old repository `.codex/skills` are not guessed.
+- Codex includes CODEX_HOME user/system roots and configured installed plugins.
+  Trusted legacy repository roots and explicit system/admin options are supported.
+  See [Codex coverage](CODEX.md#catalog-resolution).
 - Discovery does not reproduce live session state, repository trust, non-file managed restrictions,
   CLI/session setting overrides, legacy commands, `--add-dir`,
   bundled skills, skills-directory plugins, or skills activated later by file access. It is a local catalog, not telemetry
   of which skills a host actually loaded or invoked.
-- Only Codex user TOML disable entries are read; project/managed config layering
-  is deferred. Malformed config yields diagnostics; known explicit-only skills
-  remain excluded. Review diagnostics before relying on the catalog.
+- Codex skill enablement rules use user path/name selectors, matching the verified
+  source contract. Trusted project plugin settings are distinct from SkillDispatch
+  project trust. Malformed authority excludes affected candidates; session flags,
+  cloud/MDM policy and profile resolution remain limitations.
 
 ## Routing evaluation
 
@@ -295,7 +297,7 @@ skilldispatch hooks install codex
 skilldispatch doctor
 ```
 
-Installation edits only user `~/.claude/settings.json` or `~/.codex/hooks.json`.
+Installation edits only user `~/.claude/settings.json` or `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`).
 It resolves an absolute Node executable/CLI entrypoint with platform-safe quoting,
 so host PATH need not match the interactive shell. Repeated installation reconciles
 owned registrations without duplicates. Unrelated hooks/settings are preserved.
@@ -316,7 +318,7 @@ hook:
 Advisory uses a synchronous UserPromptSubmit handler. A config change alone does
 not edit host settings: status/doctor report a mismatch until install reconciles
 it. Switching Claude to shadow and reinstalling restores async execution.
-`--sync` is available for Claude shadow debugging; Codex remains async-only and
+`--sync` is available for Claude shadow debugging; Codex shadow retains async and
 rejects that option. Observer hooks stay async in either mode.
 
 Advisory requires complete routing and safe native skill identifiers. It injects
@@ -345,7 +347,7 @@ async command hooks; replace the illustrative command with an absolute command i
 PATH differs in the host. The installer generates safer absolute commands for you.
 
 For [Codex hooks](https://learn.chatgpt.com/docs/hooks), use
-`~/.codex/hooks.json`. Review/trust the definition before it runs. If your user
+`$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`). Review/trust the definition before it runs. If your user
 config already uses inline hooks, keep that source instead of creating hooks.json:
 
 ```json
@@ -420,9 +422,10 @@ hook:
 
 The default is false. Only the user layer can set this switch; project or explicit
 CLI config cannot enable it. Without trust, project config is not even read or
-validated. With trust, the usual project layer can override user routing/telemetry
-settings, so enable this only for environments where those repositories are
-trusted. Execution modes remain user-owned even under this opt-in. Hook commands
+validated. With trust, project routing policy/discovery settings may apply.
+Provider selection/options, telemetry/raw storage, modes and Codex contract selection
+remain user-owned. Users upgrading from 0.1.0 must move any trusted-project provider
+or telemetry settings to their user config for hooks to use them. Hook commands
 have no explicit config override. Ordinary
 `discover` / `route` / `eval` retain user → project → explicit CLI layering.
 
@@ -495,17 +498,19 @@ setup failures produce failed traces when safe setup is available. Config,
 discovery or key failures may prevent any trace. Writer failures are swallowed.
 Events use one append each; storage is best effort, not a durable audit log.
 
-### Host visibility and Codex advisory deferral
+### Host visibility and Codex advisory
 
-Only supplied prompt text is evaluated. Codex currently omits structured
-attachments from this event, as reported in [upstream #41128](https://github.com/openai/codex/issues/41128).
-SkillDispatch does not inspect transcripts, images, session files or missing
-Claude content to compensate. Empty/whitespace-only text is a safe no-op.
+Only supplied prompt text is evaluated. Empty/whitespace-only prompts are no-ops.
+Missing attachments are not reconstructed from transcripts. Codex's verified
+UserPromptSubmit contract places additional context in a developer fragment;
+SkillDispatch's wording supplements the original task without asking for an
+acknowledgment. Textual skill names are recommendations, not structured skill input.
+See [Codex setup, observations and compatibility](CODEX.md).
 
-Codex stays shadow-only. Its context placement/salience concern is tracked in
-[upstream #40680](https://github.com/openai/codex/issues/40680). Codex has no context
-injection in v0.1.0. Claude advisory is separately opt-in; delivery alone does not
-prove native invocation or improved routing accuracy.
+Codex route traces use schema v2; Claude route and invocation v1 remain unchanged.
+Trace commands emit JSON envelope version 2, with separate `instructionReads` and
+`instructionReadHealth` fields. Unknown schema versions are counted separately
+from corrupt lines. Human text is responsive; scripts should check JSON versions.
 
 ## Library and architecture
 
@@ -535,9 +540,9 @@ src/
   config/       YAML validation and layered loading
   eval/         YAML schema, selector resolution, metrics and sequential runner
   runtime/      Config/discovery/provider composition shared by CLI and hooks
-  hooks/        Bounded stdin, shared mode-aware runtime and safe Claude advisory
+  hooks/        Bounded stdin, shared mode-aware runtime and host-specific advisory
   telemetry/    Trace projection, HMAC, fingerprint, safe JSONL and analytics
-  observability/ Claude Skill observer, lifecycle correlation and observed adoption
+  observability/ Host-specific evidence streams, lifecycle correlation and observed adoption
   registration/ User-scope hook inspection, planning and atomic updates
   ops/          Offline readiness and storage health checks
   cli/          Commands and privacy-safe output views
@@ -774,7 +779,8 @@ persistence prerequisites were detected **at routing time**. Configured ≠ deli
 observer startup, delivery, or complete observation of that turn. No real-user settings are
 changed during tests. All three observer handlers use exact matcher `Skill` and
 `skilldispatch hook claude-skill`; `hooks uninstall claude` removes only the
-managed routing/observer registrations. Codex remains shadow-only.
+managed routing/observer registrations. Codex uses its own advisory contract and
+instruction-read stream, described in [Codex integration](CODEX.md).
 
 The invocation stream uses the existing private installation key. Session and
 prompt HMACs match routing traces; tool IDs use a separate session-scoped HMAC.

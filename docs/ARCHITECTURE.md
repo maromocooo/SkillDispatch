@@ -12,7 +12,7 @@ flowchart TD
   H --> C[Native catalog discovery]
   C --> V[RouterProvider]
   V --> R[Routing policy: zero or more skills]
-  R --> D[Shadow or Claude advisory delivery]
+  R --> D[Shadow or opt-in advisory delivery]
   P --> A[Host agent]
   D -->|advisory identifiers only| A
   R --> T[Route trace stream]
@@ -116,13 +116,13 @@ Implementation coverage and special-policy details are in
 
 ### Codex
 
-The adapter scans `.agents/skills` from cwd to the Git root, `~/.agents/skills`,
-admin roots (default `/etc/codex/skills`) and explicitly supplied system roots.
-Codex user `config.toml` honors `CODEX_HOME`; per-path disabled entries and
-`agents/openai.yaml`'s `allow_implicit_invocation: false` exclude automatic routing.
-System installation paths and plugin caches are not guessed. Generic/Codex parsing
-requires nonblank names and descriptions; Claude adapter fallbacks are separate.
-See the official [Codex skills documentation](https://learn.chatgpt.com/docs/build-skills).
+Codex adds CODEX_HOME `skills/` and `.system` to project/user `.agents/skills`,
+trusted legacy project `.codex/skills`, admin and explicitly supplied roots.
+Configured enabled plugins resolve known installation roots; caches alone confer no
+eligibility. Native manifest namespaces, per-path/per-name user selectors and
+implicit policy stay adapter-owned. Ambiguous versions, unsupported profiles and
+policy failures are conservative. Session availability remains unconfirmed.
+See [Codex contract, source references and limitations](CODEX.md).
 
 ### Native catalog identity and fingerprint
 
@@ -200,7 +200,8 @@ implemented.
 Host adapters accept bounded UserPromptSubmit JSON, validate required/known fields
 and ignore unknown additions. They use host cwd for single-agent discovery and never
 read transcript files. Shadow returns no context or stdout and exits successfully.
-Codex remains shadow-only; its registrations are async.
+Codex shadow remains async. Supported Codex advisory requires synchronous registration
+and a user-declared contract; see [Codex integration](CODEX.md).
 
 ### Claude advisory
 
@@ -236,7 +237,7 @@ See [operational setup](OPERATIONS.md#hook-registration-and-modes).
 
 ## Observability
 
-### Route Trace v1
+### Versioned route traces
 
 [Route Trace v1](../schemas/route-trace.schema.json) records timestamp/UUID, host,
 mode, prompt storage policy, catalog fingerprint/counts, provider/model/latency,
@@ -263,6 +264,22 @@ PreToolUse; success means native tool completion. Missing terminal events are
 unknown. Unknown catalog names remain unresolved events; only exact native-name
 matches add path-free catalog metadata. `agent_id` presence records a subagent
 marker, not its ID or any routing action. Direct user slash invocation is excluded.
+
+### Codex instruction-read stream
+
+Codex's supported hooks expose normalized Bash commands, not a native Skill tool.
+The observer recognizes only a single literal absolute `cat` read of SKILL.md,
+then performs targeted catalog lookup. It never executes commands. Relative paths,
+partial reads, dynamic syntax and nested wrappers are not evidence. Output text
+cannot prove exit code or completeness, so a Post records `terminal-observed` with
+unknown outcome. Names, logical identity and current content hash are projected;
+commands, paths, responses and raw IDs are discarded.
+
+The independent [Codex read schema](../schemas/codex-instruction-read.schema.json)
+and [Codex route v2 schema](../schemas/route-trace-next.schema.json) preserve the
+published Claude/v1 schemas. New readers accept v1/v2 and separately report unsupported
+versions. CLI JSON envelope version 2 exposes evidence-specific fields. Old CLIs do
+not understand the new records. No file is migrated or rewritten.
 
 ### Correlation and positive evidence
 
@@ -345,8 +362,9 @@ see [a library example](OPERATIONS.md#library-and-architecture).
 ## Known architectural limitations
 
 The local catalog cannot certify live host state, trust, account selection, session
-settings, lazy/bundled skills or host reload. Advisory is Claude-only and adds latency.
+settings, lazy/bundled skills or host reload. Advisory adds latency and depends on a supported host contract.
 Observers are async positive evidence, not complete turn coverage or task-quality
-measurement. There is no direct-user slash telemetry, Codex invocation telemetry,
+measurement. Codex read attempts do not prove complete loading, successful execution
+or native invocation. There is no direct-user slash telemetry,
 subagent routing, transcript scraping, cloud upload or automatic tuning. Public
 eval fixtures are synthetic drafts and do not establish better-than-native routing.

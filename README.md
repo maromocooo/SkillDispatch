@@ -7,14 +7,18 @@ invocations were observed.
 
 SkillDispatch discovers a model-routable catalog, routes each prompt to zero or
 more skills, and connects host-native delivery with local observation. It supports
-Claude Code and Codex through agent adapters; Claude also supports advisory and
-native Skill tool observers. **Recommended does not mean invoked.**
+Claude Code and Codex through agent adapters, explicit advisory and evidence-specific
+observers. Claude exposes native Skill calls; Codex exposes narrower instruction-read
+requests and terminal events. **Recommended does not mean invoked.**
 
 Node.js 20+; MIT licensed.
 
 Try the [offline demo](#offline-demo) without an API key, or follow the
 [Quick Start](#quick-start) to register shadow hooks. Jev is the first real routing
 provider; the provider contract and agent adapters keep the runtime extensible.
+
+> This branch prepares **0.2.0 (unreleased)**. npm latest remains 0.1.0, whose Codex
+> support is shadow-only. The Codex features below require the reviewed 0.2.0 candidate.
 
 ## Why SkillDispatch?
 
@@ -51,12 +55,12 @@ flowchart TD
   N --> M[Eval metrics]
 ```
 
-Shadow routing and invocation observers run asynchronously. Claude advisory waits
+Shadow routing and observers run asynchronously. Opt-in advisory waits
 for routing to supply a recommendation to the current turn. No skill body is injected.
 
 ## Quick Start
 
-Install Node.js 20+, then use npm to install version 0.1.0:
+Install Node.js 20+. The published stable release is still 0.1.0:
 
 ```sh
 npm install --global skilldispatch@0.1.0
@@ -70,7 +74,7 @@ cd SkillDispatch
 pnpm install --frozen-lockfile
 pnpm build
 pnpm pack
-npm install --global ./skilldispatch-0.1.0.tgz
+npm install --global ./skilldispatch-0.2.0.tgz
 ```
 
 For real routing, obtain a TypeSafe API key and make it available to the shell that
@@ -118,11 +122,13 @@ are retained; uninstall never restores a whole host config from backup.
 | Capability | Claude Code | Codex |
 |---|---|---|
 | Local/project skills | Yes | Yes |
-| Synced and enabled plugin skills | Yes, local state snapshot | Not supported |
-| File-managed skills | Read-only where documented | Configured admin/system sources |
-| Shadow routing | Async by default | Async only |
-| Advisory | Explicit opt-in, synchronous | Not yet |
-| Observed model Skill invocation | Async Pre/Post/Failure observers | Not yet |
+| Enabled installed plugin skills | Local state snapshot | Configured installed roots; ambiguous versions excluded |
+| Synced skills | Supported | No Claude-style synced source |
+| File-managed/system skills | Read-only where documented | Admin roots, CODEX_HOME user skills and `.system` |
+| Shadow routing | Async by default | Async by default |
+| Advisory | Explicit opt-in, synchronous | Explicit opt-in, synchronous; verified target contract required |
+| Observed model Skill invocation | Async Pre/Post/Failure observers | No supported dedicated native invocation event |
+| Instruction-read evidence | Separate native invocation evidence | Async Bash Pre/Post; narrow absolute literal `cat` requests, terminal success unknown |
 
 Discovery is a conservative local snapshot, not the host's private session catalog.
 Bundled, lazy/nested, extra-directory and session-only sources are not fully covered.
@@ -155,7 +161,9 @@ Only safe, unambiguous, model-invocable native skill identifiers enter
 its native Skill tool. Returning the mode to `shadow` and reinstalling restores async.
 Changing configuration alone does not silently mutate host registrations.
 
-Codex remains shadow-only. Codex inline `[hooks]` conflicts are refused instead of
+Codex advisory and read observers require a user-declared, source-verified target
+contract. See [Codex setup and limitations](docs/CODEX.md#opt-in-and-rollback).
+Codex inline `[hooks]` conflicts are refused instead of
 rewriting `config.toml`; see the [manual setup alternative](docs/OPERATIONS.md#manual-alternative-and-codex-inline-conflict).
 
 ## Example and offline demo
@@ -196,7 +204,12 @@ injection-to-invocation and success conversion rates are intentionally absent.
 Direct user `/skillname` commands are outside model-adoption metrics. Success means
 native tool completion, not task quality or adherence to instructions.
 
-Default files: `~/.local/share/skilldispatch/traces.jsonl` and `invocations.jsonl`.
+Default streams under `~/.local/share/skilldispatch/`: `traces.jsonl`,
+`invocations.jsonl` (Claude), and `codex-instruction-reads.jsonl` (Codex).
+Codex read attempts/terminal events are shown separately and never increase Claude
+model-invoked/succeeded counts. Post delivery alone does not establish exit success.
+Trace CLI JSON uses envelope version 2; old files remain readable, while older CLIs
+cannot read new Codex v2 route records. [Compatibility](docs/CODEX.md#storage-and-compatibility).
 `SKILLDISPATCH_DATA_DIR` / `XDG_DATA_HOME` can relocate storage. Summary reports
 latencies, failures, selected skill versions and observed adoption; “never selected”
 means seen in decisions but never selected, not every skill installed on your machine.
@@ -249,7 +262,8 @@ high, and thresholds are not universally calibrated.
 - Invocation events contain native identifiers and keyed correlation metadata,
   never args, tool responses, raw host IDs, error strings or transcripts.
 - Global hooks ignore project SkillDispatch config by default. Even trusted project
-  config cannot enable advisory; execution mode is always user-owned.
+  config cannot enable advisory, choose a provider or change hook persistence;
+  these settings are user-owned.
 - Files use private permissions and symlink/hardlink protections. Hooks fail open.
   No guarantee is made against a compromised OS or a process running as your user.
 
@@ -269,7 +283,7 @@ Config and examples: [reference](docs/OPERATIONS.md#configuration),
 | `discover [--agent claude-code]` | Catalog and source diagnostics |
 | `route "prompt" [--json]` | One prompt through configured routing policy |
 | `eval file.yaml [--json]` | Labeled routing quality and optional CI gates |
-| `hook codex`, `hook claude`, `hook claude-skill` | Host stdin entrypoints |
+| `hook codex`, `hook claude`, `hook claude-skill`, `hook codex-read` | Host stdin entrypoints |
 | `hooks status/install/uninstall` | Safe user-scope registration management |
 | `doctor [--json]` | Offline installation, routing and observer prerequisites |
 | `traces summary/list/show` | Privacy-safe local analytics |
@@ -294,7 +308,7 @@ adds latency and is only a recommendation. Native catalog completeness and routi
 accuracy are not guaranteed. There is no delivery witness, cloud sync, automatic
 threshold tuning or trace retention daemon.
 
-Possible future work: Codex advisory/observers, subagent-aware routing, richer evals,
+Possible future work: richer Codex native evidence, subagent-aware routing, richer evals,
 local/non-Jev providers and optional external visualization integrations.
 
 ## Contributing and release

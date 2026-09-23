@@ -41,6 +41,8 @@ export function auditTarball(tarball) {
     "dist/index.d.ts",
     "schemas/route-trace.schema.json",
     "schemas/skill-invocation.schema.json",
+    "schemas/route-trace-next.schema.json",
+    "schemas/codex-instruction-read.schema.json",
     "LICENSE",
     "README.md",
     "CHANGELOG.md",
@@ -53,7 +55,7 @@ export function auditTarball(tarball) {
     read(["-xOzf", resolve(tarball), "package/package.json"]),
   );
   assert.equal(metadata.name, "skilldispatch");
-  assert.equal(metadata.version, "0.1.0");
+  assert.equal(metadata.version, "0.2.0");
   assert.equal(metadata.license, "MIT");
   return files;
 }

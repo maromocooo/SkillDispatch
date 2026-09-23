@@ -10,7 +10,7 @@ request. Route sensitive prompts only when you accept that external data boundar
 The application has no trace upload, cloud analytics or account service.
 
 UserPromptSubmit hooks fail open under parsing, setup, provider, timeout and storage
-failure. Shadow and observers are silent. Claude advisory emits only bounded JSON
+failure. Shadow and observers are silent. Advisory emits only bounded host-specific JSON
 with safe native identifiers after complete routing; no blocking decision, body,
 description, probability or priority escalation enters context. Host native
 permissions/invocation remain authoritative. Fail-open is not an enforcement mode.
@@ -22,8 +22,9 @@ Global hooks ignore project SkillDispatch config unless the user sets
 `hook.trustProjectConfig: true`. Project skill discovery still uses host cwd.
 Even with that opt-in, execution modes are user-owned, so a project cannot silently
 enable advisory. Invocation observer enablement/storage uses user config only.
-The user opt-in grants broader routing/trace configuration trust; review repos
-before enabling it. Registration commands edit user scope only and preserve
+The opt-in permits project routing policy/discovery overrides, not provider,
+telemetry, raw storage, mode or Codex target-contract authority. Existing 0.1.0
+trusted-project provider/telemetry overrides must move to user config. Registration commands edit user scope only and preserve
 unrelated settings; they refuse malformed, linked or conflicting destinations.
 
 ## Local storage and sharing
@@ -54,6 +55,14 @@ marker checks local registration/persistence prerequisites only. Missing events
 remain unknown; no exact conversion or success percentage is inferred. Native tool
 success does not prove task quality. Direct `/skillname` and unsupported catalogs
 are not fully observed. There is no transcript scraping or delivery witness.
+
+Codex uses a separate instruction-read stream. Only narrow literal absolute read
+requests are recognized; observers never execute received commands. Targeted catalog
+lookup compares canonical paths in memory and stores no paths. Post output lacks an
+authoritative exit code/completeness flag in supported hosts: terminal outcome is
+unknown. Content/version is the observation-time snapshot, compared exactly to the
+route's identity/hash, never treated as proof of an earlier version. Subagent or
+unknown contexts cannot increase main adoption counts. No transcript is read.
 
 ## Maintenance
 

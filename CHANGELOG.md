@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0 — Unreleased
+
+- Expand Codex discovery to CODEX_HOME user/system roots and configured installed
+  plugin skills, with conservative eligibility and path-free catalog fingerprints.
+- Add user-owned Codex advisory for verified target contracts, synchronous
+  reconciliation, status/doctor and rollback through the existing safe installer.
+- Observe narrow Codex instruction-read requests and terminal events in a separate
+  local stream. This is not native Skill invocation, exit success or full loading.
+- Correlate exact agent/session/turn/tool identities and content versions; expose
+  Codex read evidence separately from unchanged Claude invocation analytics.
+- Retain old route/invocation files; introduce Codex route v2, read-event v1 and
+  trace CLI JSON envelope v2. Older CLIs cannot read new Codex route records.
+- Keep provider and hook persistence user-owned even for trusted project configs;
+  move any previously trusted-project provider/telemetry overrides to user config.
+
+Known limits: source-verified contracts require real-host validation; live session,
+cloud/account/MDM/profile state is not reconstructed. Async absence remains unknown.
+Unsupported or ambiguous catalog/policy states are excluded, not guessed.
+
 ## 0.1.0
 
 - Discover Codex and Claude Code local/project skills; include Claude synced,

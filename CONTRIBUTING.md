@@ -38,7 +38,7 @@ For release-facing changes, also run:
 ```sh
 node scripts/public-benchmark.mjs --mock
 pnpm pack --pack-destination artifacts
-node scripts/package-smoke.mjs artifacts/skilldispatch-0.1.0.tgz
+node scripts/package-smoke.mjs artifacts/skilldispatch-0.2.0.tgz
 ```
 
 Package installation may download npm dependencies; application smoke uses isolated

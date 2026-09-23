@@ -45,6 +45,7 @@ try {
     "claude-catalog-smoke",
     "claude-invocation-smoke",
     "trace-display-smoke",
+    "codex-parity-smoke",
   ]) {
     stage = script;
     const run = spawnSync(
@@ -86,14 +87,14 @@ try {
     encoding: "utf8",
     timeout: 10000,
   });
-  assert.equal(version.stdout.trim(), "0.1.0");
+  assert.equal(version.stdout.trim(), "0.2.0");
   stage = "installed public ESM API";
   const api = spawnSync(
     process.execPath,
     [
       "--input-type=module",
       "-e",
-      'import { VERSION, route, MockRouterProvider } from "skilldispatch"; if(VERSION !== "0.1.0" || typeof route !== "function" || typeof MockRouterProvider !== "function") process.exit(1);',
+      'import { VERSION, route, MockRouterProvider } from "skilldispatch"; if(VERSION !== "0.2.0" || typeof route !== "function" || typeof MockRouterProvider !== "function") process.exit(1);',
     ],
     { cwd: root, env, encoding: "utf8", timeout: 10000 },
   );
