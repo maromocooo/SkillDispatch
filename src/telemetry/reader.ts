@@ -12,6 +12,7 @@ export class TraceReadError extends Error {
 }
 export type JsonlReadResult<T> =
   | { kind: "valid"; line: number; trace: T }
+  | { kind: "unsupported"; line: number; code: "unsupported_version" }
   | {
       kind: "invalid";
       line: number;
@@ -104,6 +105,7 @@ export class PrivateJsonlReader<T> {
     private readonly schema: {
       safeParse(raw: unknown): { success: true; data: T } | { success: false };
     },
+    private readonly versions?: readonly string[],
   ) {}
   async *read(): AsyncIterable<JsonlReadResult<T>> {
     let file: FileHandle | undefined;
@@ -137,6 +139,20 @@ export class PrivateJsonlReader<T> {
                 Buffer.concat(parts, length),
               ),
             );
+            const version =
+              raw && typeof raw === "object" && "schemaVersion" in raw
+                ? raw.schemaVersion
+                : undefined;
+            if (
+              this.versions &&
+              typeof version === "string" &&
+              !this.versions.includes(version)
+            ) {
+              parts = [];
+              length = 0;
+              oversized = false;
+              return { kind: "unsupported", line, code: "unsupported_version" };
+            }
             const parsed = this.schema.safeParse(raw);
             result = parsed.success
               ? { kind: "valid", line, trace: parsed.data }
@@ -183,6 +199,6 @@ export class JsonlTraceReader
   implements TraceReader
 {
   constructor(path: string, protectedPaths: readonly string[]) {
-    super(path, protectedPaths, routeTraceSchema);
+    super(path, protectedPaths, routeTraceSchema, ["1.0", "2.0"]);
   }
 }

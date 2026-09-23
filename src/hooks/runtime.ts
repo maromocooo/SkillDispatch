@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { route } from "../core/route.js";
 import type { RouteResult } from "../core/types.js";
 import { supportedCodexContract } from "../hosts/codex-contract.js";
+import { codexReadPath } from "../observability/codex-read-storage.js";
 import { invocationPath } from "../observability/invocation-storage.js";
 import type { RouterProvider } from "../providers/types.js";
 import {
@@ -66,7 +67,10 @@ export async function runHook(
     const directory = dataDirectory(environment);
     // A configured trace destination must never append JSON into the installation key.
     if (path === join(directory, "install.key")) return;
-    await assertTraceDestination(path, [invocationPath(environment)]);
+    await assertTraceDestination(path, [
+      invocationPath(environment),
+      codexReadPath(environment),
+    ]);
     const key = await services.getKey(directory);
     // Parent aliases (for example /tmp and /private/tmp) can name the same key.
     const keyPath = await realpath(join(directory, "install.key"));
@@ -144,10 +148,7 @@ export async function runHook(
       }
     }
     let invocationObserverConfigured = false;
-    if (
-      input.agent === "claude-code" &&
-      input.promptCorrelationId !== undefined
-    ) {
+    if (input.promptCorrelationId !== undefined) {
       try {
         invocationObserverConfigured =
           await services.invocationObserverConfigured();
@@ -158,7 +159,12 @@ export async function runHook(
     const trace = createRouteTrace({
       schemaVersion: input.agent === "codex" ? "2.0" : "1.0",
       ...(invocationObserverConfigured
-        ? { capabilities: { skillInvocationTelemetry: true as const } }
+        ? {
+            capabilities:
+              input.agent === "codex"
+                ? { skillInstructionReadTelemetry: true as const }
+                : { skillInvocationTelemetry: true as const },
+          }
         : {}),
       agent: input.agent,
       mode,

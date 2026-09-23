@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "agent": {
+      "type": "string",
+      "const": "codex"
+    },
+    "evidence": {
+      "type": "string",
+      "const": "skill-instructions-read"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "attempted",
+        "terminal-observed"
+      ]
+    },
+    "outcome": {
+      "type": "string",
+      "const": "unknown",
+      "description": "The verified Bash hook response has no authoritative exit status or completeness indication."
+    },
+    "sessionKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "promptKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "toolUseKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "skill": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "resolved": {
+              "type": "boolean",
+              "const": false
+            }
+          },
+          "required": [
+            "resolved"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "resolved": {
+              "type": "boolean",
+              "const": true
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 257
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "local-user",
+                "local-project",
+                "system",
+                "plugin",
+                "admin",
+                "unknown"
+              ]
+            },
+            "catalogIdentity": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contentHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "resolved",
+            "name",
+            "origin",
+            "catalogIdentity",
+            "contentHash"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "executionContext": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "main",
+            "subagent",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "timestamp",
+    "agent",
+    "evidence",
+    "phase",
+    "outcome",
+    "sessionKey",
+    "toolUseKey",
+    "skill",
+    "executionContext"
+  ],
+  "additionalProperties": false,
+  "$id": "https://skilldispatch.dev/schemas/codex-instruction-read-v1.json",
+  "title": "Codex instruction-read evidence v1",
+  "description": "Literal read requests and terminal events; not native invocation, full loading, compliance or task quality."
+}

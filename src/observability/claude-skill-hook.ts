@@ -159,6 +159,7 @@ export async function observeClaudeSkill(
       ((path, reserved) => new JsonlInvocationSink(path, reserved))
     )(invocationPath(environment), [
       join(directory, "install.key"),
+      join(directory, "codex-instruction-reads.jsonl"),
       tracePath(environment, config.telemetry.tracePath),
     ]);
     await sink.write(createInvocationEvent(input, key, skills, available));

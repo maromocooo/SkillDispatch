@@ -26,19 +26,22 @@ export const invocationPath = (environment: StorageContext) =>
   join(dataDirectory(environment), "invocations.jsonl");
 export class InvocationReader extends PrivateJsonlReader<SkillInvocationEvent> {
   constructor(path: string, protectedPaths: readonly string[]) {
-    super(path, protectedPaths, invocationSchema);
+    super(path, protectedPaths, invocationSchema, ["1.0"]);
   }
 }
 
 /** Fixed stream destination; never taken from project configuration. */
-export class JsonlInvocationSink implements InvocationSink {
+export class PrivateEventSink<T> {
   constructor(
     private readonly path: string,
     private readonly protectedPaths: readonly string[],
+    private readonly schema: {
+      safeParse(raw: unknown): { success: true; data: T } | { success: false };
+    },
   ) {}
-  async write(event: SkillInvocationEvent): Promise<void> {
+  async write(event: T): Promise<void> {
     try {
-      const parsed = invocationSchema.safeParse(event);
+      const parsed = this.schema.safeParse(event);
       if (!parsed.success) return;
       const line = Buffer.from(`${JSON.stringify(parsed.data)}\n`);
       if (line.length > MAX_INVOCATION_BYTES) return;
@@ -80,6 +83,15 @@ export class JsonlInvocationSink implements InvocationSink {
     } catch {
       /* Silent best effort. */
     }
+  }
+}
+
+export class JsonlInvocationSink
+  extends PrivateEventSink<SkillInvocationEvent>
+  implements InvocationSink
+{
+  constructor(path: string, protectedPaths: readonly string[]) {
+    super(path, protectedPaths, invocationSchema);
   }
 }
 

@@ -19,6 +19,7 @@ export async function invocationStorageContext(
     keyPath,
     protectedPaths: [
       keyPath,
+      join(dataDirectory(environment), "codex-instruction-reads.jsonl"),
       tracePath(environment, config.telemetry.tracePath),
       join(environment.home, ".config/skilldispatch/config.yaml"),
     ],

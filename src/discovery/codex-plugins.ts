@@ -20,6 +20,7 @@ export async function discoverCodexPlugins(
   home: string,
   configured: Record<string, { enabled: boolean }>,
   allowed: boolean,
+  targetPath?: string,
 ): Promise<DiscoveryResult> {
   const result: DiscoveryResult = { skills: [], diagnostics: [] };
   const warn = (code: string) => codexDiagnostic(result.diagnostics, code);
@@ -132,6 +133,7 @@ export async function discoverCodexPlugins(
           recursive: portable === undefined,
           followSymlinks: false,
           rootSkill: false,
+          ...(targetPath ? { targetPath } : {}),
         });
         for (const skill of found.skills) {
           skill.name = `${manifest.name}:${skill.name}`;

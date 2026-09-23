@@ -28,6 +28,8 @@ const policySchema = z.object({
 });
 
 export interface CodexDiscoveryOptions {
+  /** Observer-only exact-file lookup, without traversing unrelated skill subtrees. */
+  targetPath?: string;
   /** Overrides the default /etc/codex/skills source; [] disables admin scanning. */
   adminRoots?: readonly string[];
   /** Additional system roots; the CODEX_HOME .system root is always included. */
@@ -60,12 +62,18 @@ export class CodexDiscoveryAdapter implements DiscoveryAdapter {
         scope: "system" as const,
       })),
     ];
-    const result = await scanSources(this.agent, sources, { recursive: true });
+    const result = await scanSources(this.agent, sources, {
+      recursive: true,
+      ...(this.options.targetPath
+        ? { targetPath: this.options.targetPath }
+        : {}),
+    });
     for (const skill of result.skills) delete skill.metadata.codex;
     const plugins = await discoverCodexPlugins(
       home,
       settings.plugins,
       settings.valid && settings.pluginsValid,
+      this.options.targetPath,
     );
     result.skills.push(...plugins.skills);
     result.diagnostics.push(...settings.diagnostics, ...plugins.diagnostics);

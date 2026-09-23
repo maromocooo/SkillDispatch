@@ -1,5 +1,5 @@
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { compareText } from "../core/order.js";
 import type { AgentKind } from "../core/types.js";
 import { finalizeCatalog } from "./catalog.js";
@@ -8,6 +8,7 @@ import { type ParseSkillContext, parseSkill } from "./parse-skill.js";
 import type { DiscoveryResult, DiscoverySource } from "./types.js";
 
 interface ScanOptions {
+  targetPath?: string;
   recursive?: boolean;
   followSymlinks?: boolean;
   rootSkill?: boolean;
@@ -49,6 +50,10 @@ export async function scanSources(
             path,
           );
         return;
+      }
+      if (options.targetPath) {
+        const remaining = relative(canonical, options.targetPath);
+        if (remaining.startsWith("..") || isAbsolute(remaining)) return;
       }
       if (active.has(canonical)) {
         warn("symlink_loop", "Skipped a directory symlink cycle.", path);
