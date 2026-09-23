@@ -149,6 +149,38 @@ try {
     assert.equal(registrations.hooks[name][0].matcher, "Bash");
     assert.equal(registrations.hooks[name][0].hooks[0].async, true);
   }
+  stage = "user trust metadata leaves registration ready";
+  const hostConfig = join(codex, "config.toml");
+  const configBeforeTrust = await readFile(hostConfig, "utf8");
+  // Simulate only Codex's state write; do not compute or verify a real trust hash.
+  const trustedConfig =
+    configBeforeTrust +
+    [
+      ["UserPromptSubmit", "user_prompt_submit", 1],
+      ["PreToolUse", "pre_tool_use", 0],
+      ["PostToolUse", "post_tool_use", 0],
+    ]
+      .map(
+        ([, label, group]) =>
+          `\n[hooks.state.${JSON.stringify(`${settings}:${label}:${group}:0`)}]\ntrusted_hash="sha256:synthetic"\nenabled=true\n`,
+      )
+      .join("");
+  await write(hostConfig, trustedConfig);
+  assert.equal(status().registration, "installed");
+  assert.equal(status().execution, "sync");
+  assert.equal(status().instructionObservers.ready, true);
+  assert.deepEqual(status().issues, ["codex_host_trust_not_verified"]);
+  const doctorAfterTrust = JSON.parse(run("doctor", "--json"));
+  for (const code of [
+    "codex_advisory_ready",
+    "codex_instruction_read_telemetry_ready",
+  ])
+    assert.equal(
+      doctorAfterTrust.checks.find((c) => c.code === code).value,
+      true,
+    );
+  run("hooks", "install", "codex");
+  assert.equal(await readFile(hostConfig, "utf8"), trustedConfig);
   stage = "same-turn advisory";
   const output = hook("codex", wire),
     context = JSON.parse(output).hookSpecificOutput.additionalContext;
@@ -222,6 +254,52 @@ try {
     ),
   );
   assert.ok(run("traces", "list", "--agent", "codex").includes(trace.traceId));
+  stage = "host disablement blocks advisory without changing state";
+  const disabledRouting = trustedConfig.replace(
+    `${JSON.stringify(`${settings}:user_prompt_submit:1:0`)}]\ntrusted_hash="sha256:synthetic"\nenabled=true`,
+    `${JSON.stringify(`${settings}:user_prompt_submit:1:0`)}]\ntrusted_hash="sha256:synthetic"\nenabled=false`,
+  );
+  assert.notEqual(disabledRouting, trustedConfig);
+  await write(hostConfig, disabledRouting);
+  assert.ok(status().issues.includes("codex_hook_disabled_by_host"));
+  assert.equal(
+    JSON.parse(run("doctor", "--json")).checks.find(
+      (c) => c.code === "codex_advisory_ready",
+    ).value,
+    false,
+  );
+  assert.equal(hook("codex", { ...wire, turn_id: "host-disabled" }), "");
+  assert.equal(await readFile(hostConfig, "utf8"), disabledRouting);
+  await write(hostConfig, trustedConfig);
+  stage = "host observer disablement remains separate from routing";
+  const disabledObserver = trustedConfig.replace(
+    `${JSON.stringify(`${settings}:pre_tool_use:0:0`)}]\ntrusted_hash="sha256:synthetic"\nenabled=true`,
+    `${JSON.stringify(`${settings}:pre_tool_use:0:0`)}]\ntrusted_hash="sha256:synthetic"\nenabled=false`,
+  );
+  assert.notEqual(disabledObserver, trustedConfig);
+  await write(hostConfig, disabledObserver);
+  assert.equal(status().instructionObservers.ready, false);
+  assert.ok(status().issues.includes("codex_pre_tool_use_disabled_by_host"));
+  const disabledDoctor = JSON.parse(run("doctor", "--json"));
+  assert.equal(
+    disabledDoctor.checks.find(
+      (c) => c.code === "codex_instruction_read_telemetry_ready",
+    ).value,
+    false,
+  );
+  assert.equal(
+    disabledDoctor.checks.find((c) => c.code === "codex_advisory_ready").value,
+    true,
+  );
+  assert.ok(
+    JSON.parse(hook("codex", { ...wire, turn_id: "observer-disabled" }))
+      .hookSpecificOutput.additionalContext,
+  );
+  assert.notEqual(
+    (await routing()).at(-1).capabilities?.skillInstructionReadTelemetry,
+    true,
+  );
+  await write(hostConfig, trustedConfig);
   stage = "rollback and uninstall";
   await configure("shadow");
   run("hooks", "install", "codex");
@@ -229,10 +307,11 @@ try {
   assert.equal(hook("codex", { ...wire, turn_id: "rollback" }), "");
   run("hooks", "uninstall", "codex");
   assert.deepEqual(JSON.parse(await readFile(settings, "utf8")), original);
+  assert.equal(await readFile(hostConfig, "utf8"), trustedConfig);
   assert.equal(await readFile(claude, "utf8"), '{"fixture":"untouched"}');
   await assert.rejects(access(join(root, "network-attempt")));
   console.log(
-    `PASS ${process.version}: installed Codex ${contract} catalog/shadow/advisory/read-evidence/correlation/JSON/text/rollback; synthetic fixtures only; no model API`,
+    `PASS ${process.version}: installed Codex ${contract} catalog/shadow/advisory/trust-state/disablement/read-evidence/correlation/JSON/text/rollback; synthetic fixtures only; no model API`,
   );
 } catch (error) {
   console.error(

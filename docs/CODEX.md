@@ -190,6 +190,54 @@ Other registrations and existing telemetry files remain intact. For isolated tes
 run rollback/uninstall through the same profile wrapper. Stop that profile to return
 to your untouched stable environment; do not share its advisory config with 0.1.0.
 
+## Host-managed hook state
+
+Codex keeps inline event definitions and per-handler metadata separate in
+`config.toml`: `HooksToml.events` is flattened beneath `hooks`, while `hooks.state`
+maps handler keys to optional boolean `enabled` and string `trusted_hash` fields.
+The `/hooks` trust action writes `trusted_hash` under `hooks.state`; it does not
+create an inline event definition. SkillDispatch accepts state-only or empty
+`hooks` tables and never edits, removes or generates this host-managed state.
+
+The pinned CLI `HookEventsToml` names are `PreToolUse`, `PermissionRequest`,
+`PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`,
+`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, and `Interrupt`.
+For example, `[[hooks.PreToolUse]]` with nested `[[hooks.PreToolUse.hooks]]`
+declares an inline event source. Codex merges inline events and `hooks.json`
+within a layer and warns at startup. SkillDispatch conservatively requires manual
+resolution for any event key (even an empty event array) or unknown child of
+`hooks` other than `state`. It never merges or takes ownership of inline hooks.
+Malformed state, unknown state fields and ambiguous normalized keys produce a
+safe diagnostic without TOML content, paths or hashes.
+
+For the verified contracts, persisted user hook-state keys use the source path,
+snake-case event label and original zero-based group/handler indices:
+`<absolute hooks.json path>:user_prompt_submit:<group>:<handler>`.
+SkillDispatch first checks exact command/args ownership, then matches this key.
+An own routing handler with `enabled=false` blocks local advisory readiness with
+`codex_hook_disabled_by_host`. An own observer disabled in the same way blocks
+observer readiness with `codex_pre_tool_use_disabled_by_host` or
+`codex_post_tool_use_disabled_by_host`; observer readiness remains independent of
+routing readiness. Unrelated handlers are not claimed from state keys alone.
+
+This is inspection of the user layer, not live host attestation. Session overrides,
+host trust/reload, managed policy and actual delivery still require user verification.
+The presence of `trusted_hash` never proves trust, and SkillDispatch does not
+reimplement Codex's trust-hash algorithm. `codex_host_trust_not_verified` remains
+even after the local state is readable. Reinstall/uninstall preserve the TOML state.
+
+Source references at the verified 0.156.1 commit:
+[events/state schema](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/config/src/hook_config.rs),
+[persisted keys](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/hooks/src/lib.rs),
+[user/session state precedence](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/hooks/src/config_rules.rs),
+[trust writes](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/tui/src/hooks_rpc.rs),
+[discovery and enablement](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/hooks/src/engine/discovery.rs).
+
+In an isolated profile, check status/doctor before trust, review the hooks yourself
+in Codex `/hooks`, exit, then check the same profile again. State-only trust metadata
+must leave synchronous advisory and asynchronous observers locally ready. Real
+same-turn delivery and natural-use evidence are separate live checks.
+
 ## Upgrade isolation
 
 **A separate package prefix does not isolate host integration.** Ownership checks

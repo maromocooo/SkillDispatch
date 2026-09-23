@@ -152,7 +152,8 @@ describe("hooks CLI", () => {
   it("inline conflict returns exit 1 with safe reason, without mutation", async () => {
     const ctx = await fixture();
     const path = join(ctx.home, ".codex/config.toml");
-    const text = "[hooks]\n# PRIVATE_TOML_SECRET\n";
+    const text =
+      '[[hooks.PreToolUse]]\nmatcher = "Bash"\n[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "PRIVATE_TOML_SECRET"\n';
     await write(path, text);
     const status = await run(["hooks", "status", "codex", "--json"], ctx);
     expect(status.exit).toBe(1);

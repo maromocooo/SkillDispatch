@@ -137,18 +137,16 @@ describe.each(["codex", "claude"] as const)(
   },
 );
 describe("Codex inline hook conflicts", () => {
-  it.each([
-    "[hooks]\n",
-    "hooks = {}",
-    "[[hooks.UserPromptSubmit]]\n",
-    "hooks.UserPromptSubmit = []",
-  ])("detects TOML hooks with %s", async (toml) => {
-    const ctx = await workspace();
-    await write(join(ctx.home, ".codex/config.toml"), toml);
-    expect((await inspectRegistration("codex", ctx, execution)).issues).toEqual(
-      ["codex_inline_hooks_manual_action_required"],
-    );
-  });
+  it.each(["[[hooks.UserPromptSubmit]]\n", "hooks.UserPromptSubmit = []"])(
+    "detects TOML hooks with %s",
+    async (toml) => {
+      const ctx = await workspace();
+      await write(join(ctx.home, ".codex/config.toml"), toml);
+      expect(
+        (await inspectRegistration("codex", ctx, execution)).issues,
+      ).toEqual(["codex_inline_hooks_manual_action_required"]);
+    },
+  );
   it("does not confuse comments/quoted strings/nested keys with top-level hooks", async () => {
     const ctx = await workspace();
     await write(

@@ -1,10 +1,10 @@
 import { isAbsolute, join, resolve } from "node:path";
-import { parse as parseToml } from "smol-toml";
 import {
   codexReadEvents,
   supportedCodexContract,
 } from "../hosts/codex-contract.js";
 import { invocationEvents } from "../observability/invocation-types.js";
+import { codexHookDisabled, readCodexHookState } from "./codex-state.js";
 import {
   codexObserverCommand,
   shadowCommand,
@@ -44,23 +44,7 @@ export function hostPaths(host: Host, environment: RegistrationEnvironment) {
   };
 }
 export async function checkCodexInline(path: string) {
-  const file = await readHostFile(path);
-  if (!file) return;
-  let parsed: object;
-  try {
-    parsed = parseToml(
-      new TextDecoder("utf8", { fatal: true }).decode(file.bytes),
-    );
-  } catch {
-    throw new RegistrationError("malformed_codex_toml");
-  }
-  const features = (parsed as { features?: { hooks?: unknown } }).features;
-  if (features?.hooks === false)
-    throw new RegistrationError("host_hooks_disabled");
-  if (features?.hooks !== undefined && typeof features.hooks !== "boolean")
-    throw new RegistrationError("malformed_codex_toml");
-  if (Object.hasOwn(parsed, "hooks"))
-    throw new RegistrationError("codex_inline_hooks_manual_action_required");
+  return readCodexHookState(path);
 }
 export async function loadRegistration(
   host: Host,
@@ -68,7 +52,10 @@ export async function loadRegistration(
   checkInline = true,
 ) {
   const paths = hostPaths(host, environment);
-  if (host === "codex" && checkInline) await checkCodexInline(paths.toml);
+  const codexState =
+    host === "codex" && checkInline
+      ? await checkCodexInline(paths.toml)
+      : new Map<string, boolean | undefined>();
   const snapshot = await readHostFile(paths.config);
   let text: string;
   try {
@@ -78,7 +65,7 @@ export async function loadRegistration(
   } catch {
     throw new RegistrationError("malformed_host_json");
   }
-  return { paths, snapshot, document: new HookDocument(text) };
+  return { paths, snapshot, document: new HookDocument(text), codexState };
 }
 export async function inspectRegistration(
   host: Host,
@@ -100,7 +87,10 @@ export async function inspectRegistration(
   try {
     status.mode = await registrationMode(host, environment);
     status.expectedExecution = status.mode === "advisory" ? "sync" : "async";
-    const { document } = await loadRegistration(host, environment);
+    const { document, paths, codexState } = await loadRegistration(
+      host,
+      environment,
+    );
     if (!execution) throw new RegistrationError("cli_identity_unavailable");
     const command = shadowCommand(host, execution);
     const matching = document
@@ -136,6 +126,18 @@ export async function inspectRegistration(
     )
       status.issues.push("modified_registration_manual_action_required");
     if (status.issues.length) status.registration = "conflict";
+    if (
+      host === "codex" &&
+      matching.some((handler) =>
+        codexHookDisabled(
+          codexState,
+          paths.config,
+          "UserPromptSubmit",
+          handler,
+        ),
+      )
+    )
+      status.issues.push("codex_hook_disabled_by_host");
     if (host === "claude" && document.node(["disableAllHooks"])?.value === true)
       status.issues.push("host_hooks_disabled");
     if (matching.length && status.execution !== status.expectedExecution)
@@ -152,7 +154,19 @@ export async function inspectRegistration(
             .handlers(event)
             .filter((h) => ownsHandler(h.value, observer));
           const first = owned[0];
+          const disabled =
+            isCodex &&
+            owned.some((handler) =>
+              codexHookDisabled(codexState, paths.config, event, handler),
+            );
+          if (disabled)
+            status.issues.push(
+              event === "PreToolUse"
+                ? "codex_pre_tool_use_disabled_by_host"
+                : "codex_post_tool_use_disabled_by_host",
+            );
           const conflict =
+            disabled ||
             owned.length > 1 ||
             owned.some(
               (h) =>
@@ -232,6 +246,8 @@ export function routingRegistrationIssues(status: HookStatus): string[] {
     (code) =>
       code !== "skill_invocation_telemetry_incomplete" &&
       code !== "skill_instruction_telemetry_incomplete" &&
+      code !== "codex_pre_tool_use_disabled_by_host" &&
+      code !== "codex_post_tool_use_disabled_by_host" &&
       code !== "codex_host_trust_not_verified",
   );
 }
